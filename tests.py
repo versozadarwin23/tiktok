@@ -383,10 +383,10 @@ def create_fbunconfirmed(account_num, account_type, gender, password=None, sessi
         print(f"{FAILURE} Failed to load page and find form after {MAX_RETRIES} retries. (Account #{account_num})")
         return None
 
-    url = "https://m.facebook.com/reg"
+    url = "https://limited.facebook.com/reg?soft=hjk"
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Referer": "https://m.facebook.com/reg",
+        "Referer": "https://limited.facebook.com/reg?soft=hjk",
         "Connection": "keep-alive",
         "Accept-Language": "en-US,en;q=0.9",
         "X-FB-Connection-Type": "mobile.LTE",
