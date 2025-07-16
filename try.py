@@ -436,46 +436,50 @@ def create_fbunconfirmed_logic(account_num, account_type, gender, password=None,
 
     # Try to get access token automatically
     if not has_access_token_in_xlsx(filename_xlsx, email_address):
-        api_key = "882a8490361da98702bf97a021ddc14d"
-        secret = "62f8ce9f74b12f84c123cc23437a4a32"
+        for _ in range(3):
+            try:
+                api_key = "882a8490361da98702bf97a021ddc14d"
+                secret = "62f8ce9f74b12f84c123cc23437a4a32"
+                params = {
+                    "api_key": api_key,
+                    "email": uid,
+                    "format": "JSON",
+                    "generate_session_cookies": 1,
+                    "locale": "en_US",
+                    "method": "auth.login",
+                    "password": used_password,
+                    "return_ssl_resources": 1,
+                    "v": "1.0"
+                }
 
-        params = {
-            "api_key": api_key,
-            "email": uid,
-            "format": "JSON",
-            "generate_session_cookies": 1,
-            "locale": "en_US",
-            "method": "auth.login",
-            "password": used_password,
-            "return_ssl_resources": 1,
-            "v": "1.0"
-        }
+                sig_str = "".join(f"{key}={params[key]}" for key in sorted(params)) + secret
+                params["sig"] = hashlib.md5(sig_str.encode()).hexdigest()
 
-        sig_str = "".join(f"{key}={params[key]}" for key in sorted(params)) + secret
-        params["sig"] = hashlib.md5(sig_str.encode()).hexdigest()
+                try:
+                    resp = requests.get("https://api.facebook.com/restserver.php", params=params, headers=headers, timeout=60)
+                    data = resp.json()
+                    access_token = data.get("access_token", "")
+                    if "error_title" in data:
+                        return {"status": "TOKEN_ERROR", "message": f"Error acquiring token: {data['error_title']}"}
+                except Exception as error_title:
+                    return {"status": "TOKEN_EXCEPTION", "message": f"Exception acquiring token: {error_title}"}
 
-        try:
-            resp = requests.get("https://api.facebook.com/restserver.php", params=params, headers=headers, timeout=60)
-            data = resp.json()
-            access_token = data.get("access_token", "")
-            if "error_title" in data:
-                return {"status": "TOKEN_ERROR", "message": f"Error acquiring token: {data['error_title']}"}
-        except Exception as error_title:
-            return {"status": "TOKEN_EXCEPTION", "message": f"Exception acquiring token: {error_title}"}
-
-        if access_token.strip():
-            data_to_save = [full_name, email_address, used_password, profile_id, access_token]
-            save_to_xlsx(filename_xlsx, data_to_save)
-            save_to_txt(filename_txt, data_to_save)
-            return {
-                "status": "SUCCESS",
-                "full_name": full_name,
-                "email": email_address,
-                "password": used_password,
-                "profile_id": uid,
-                "confirmation_code": jbkj if jbkj else 'N/A (Code not found)',
-                "access_token": access_token
-            }
+                if access_token.strip():
+                    data_to_save = [full_name, email_address, used_password, profile_id, access_token]
+                    save_to_xlsx(filename_xlsx, data_to_save)
+                    save_to_txt(filename_txt, data_to_save)
+                    return {
+                        "status": "SUCCESS",
+                        "full_name": full_name,
+                        "email": email_address,
+                        "password": used_password,
+                        "profile_id": uid,
+                        "confirmation_code": jbkj if jbkj else 'N/A (Code not found)',
+                        "access_token": access_token
+                    }
+                break
+            except:
+                pass
         else:
             return {"status": "NO_ACCESS_TOKEN", "message": "Failed to acquire access token."}
     else:
@@ -715,7 +719,7 @@ def index():
                 <h1>Facebook Account Creator By Dars</h1>
                 <form id="accountForm">
                     <label for="num_accounts">Number of Accounts to Create:</label>
-                    <input type="number" id="num_accounts" name="num_accounts" value="1" min="1" required>
+                    <input type="number" id="num_accounts" name="num_accounts" value="5" min="1" required>
 
                     <label for="custom_password_base">Custom Password Base (Optional):</label>
                     <input type="text" id="custom_password_base" name="custom_password_base" placeholder="e.g., MyPass@">
@@ -826,11 +830,9 @@ def index():
                                         <p><strong>Password:</strong> <span id="password-${account.profile_id}">${account.password || 'N/A'}</span>
                                             <button class="copy-button" onclick="copyToClipboard(document.getElementById('password-${account.profile_id}').textContent, this)">Copy Password</button>
                                         </p>
-                                        <p><strong>Profile ID:</strong> ${account.profile_id || 'N/A'}</p>
                                         <p><strong>Confirmation Code:</strong> <span id="code-${account.profile_id}">${account.confirmation_code || 'N/A'}</span>
                                             <button class="copy-button" onclick="copyToClipboard(document.getElementById('code-${account.profile_id}').textContent, this)">Copy Code</button>
                                         </p>
-                                        <p><strong>Access Token:</strong> ${account.access_token || 'N/A'}</p>
                                         ${account.message ? `<p><strong>Message:</strong> ${account.message}</p>` : ''}
                                     `;
                                     resultsContent.appendChild(accountDiv);
