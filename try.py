@@ -504,6 +504,7 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
         is_phone_choice = False
     else:  # choice == '2'
         email_or_phone = phone_number
+        print(f"\033[92mUsing generated phone number:\033[0m {email_or_phone}")
         is_phone_choice = True
 
     data = {
