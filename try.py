@@ -757,7 +757,6 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
                         except:
                             pass
                         print("⚠️ Please turn on airplane mode now, then off to continue.")
-                        input()
                     else:
                         print("ℹ️ Skipping airplane mode toggle.")
 
