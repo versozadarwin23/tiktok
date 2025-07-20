@@ -267,7 +267,7 @@ def save_user_choice(key, value):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             try:
                 data = json.load(f)
-            except:
+            except json.JSONDecodeError: # Handle empty or malformed JSON
                 data = {}
     data[key] = value
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -281,7 +281,7 @@ def load_user_choice(key):
         try:
             data = json.load(f)
             return data.get(key)
-        except:
+        except json.JSONDecodeError: # Handle empty or malformed JSON
             return None
 
 
@@ -312,60 +312,74 @@ def has_access_token_in_xlsx(filename, email_address):
 
     ws = wb.active
     for row in ws.iter_rows(min_row=2, values_only=True):
-        saved_email = row[1]
-        saved_access_token = row[4]
-        if saved_email == email_address and saved_access_token and saved_access_token.strip():
-            return True
+        # Ensure row has enough columns before accessing by index
+        if len(row) > 4:
+            saved_email = row[1]
+            saved_access_token = row[4]
+            if saved_email == email_address and saved_access_token and saved_access_token.strip():
+                return True
     return False
 
 
 def save_to_xlsx(filename, data):
     header_columns = ['NAME', 'USERNAME', 'PASSWORD', 'ACCOUNT LINK', 'ACCESS TOKEN']
 
-    while True:
-        try:
-            if os.path.exists(filename):
-                try:
-                    wb = load_workbook(filename)
-                    ws = wb.active
-                except BadZipFile:
-                    print(f"\033[91m⚠️ Corrupted XLSX detected at {filename}. Recreating file...\033[0m")
-                    os.remove(filename)
+    with xlsx_lock: # Use the lock for thread-safe XLSX operations
+        while True:
+            try:
+                if os.path.exists(filename):
+                    try:
+                        wb = load_workbook(filename)
+                        ws = wb.active
+                    except BadZipFile:
+                        print(f"\033[91m⚠️ Corrupted XLSX detected at {filename}. Recreating file...\033[0m")
+                        os.remove(filename)
+                        wb = Workbook()
+                        ws = wb.active
+                        ws.append(header_columns)
+                else:
                     wb = Workbook()
                     ws = wb.active
                     ws.append(header_columns)
-            else:
-                wb = Workbook()
-                ws = wb.active
-                ws.append(header_columns)
 
-            # Ensure header is correct
-            header = [cell.value for cell in ws[1]]
-            if header != header_columns:
-                ws.delete_rows(1)
-                ws.insert_rows(1)
-                ws.append(header_columns)
+                # Ensure header is correct
+                header = [cell.value for cell in ws[1]]
+                if header != header_columns:
+                    # Clear existing content and re-add header if incorrect
+                    ws.delete_rows(1, ws.max_row)
+                    ws.append(header_columns)
+                    # Re-load existing data (if any was meant to be preserved) - currently, this just adds the header.
+                    # If existing data needs to be preserved and re-written, more complex logic is needed.
+                    # For now, assuming fresh start if header is bad.
 
-            # Check if row already exists
-            existing_rows = [tuple(row) for row in ws.iter_rows(min_row=2, values_only=True)]
-            if tuple(data) not in existing_rows:
-                ws.append(data)
+                # Check if row already exists
+                existing_rows = [tuple(row) for row in ws.iter_rows(min_row=2, values_only=True)]
+                if tuple(data) not in existing_rows:
+                    ws.append(data)
 
-            wb.save(filename)
-            break
-        except Exception as e:
-            print(f"❗ Error saving to {filename}: {e}. Retrying in 1 second...")
-            time.sleep(1)
+                wb.save(filename)
+                break
+            except Exception as e:
+                print(f"❗ Error saving to {filename}: {e}. Retrying in 1 second...")
+                time.sleep(1)
 
 
 def load_names_from_file(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        return [line.strip() for line in file if line.strip()]
+    # Added basic error handling for file not found
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return [line.strip() for line in file if line.strip()]
+    except FileNotFoundError:
+        print(f"\033[91mError: File not found at {file_path}. Please ensure 'first_name.txt' and 'last_name.txt' exist.\033[0m")
+        return []
 
 
 def get_names(account_type, gender):
     firstnames = load_names_from_file("first_name.txt")
     last_names = load_names_from_file("last_name.txt")
+    if not firstnames or not last_names:
+        # Fallback if name files are empty or missing
+        return "John", "Doe"
     firstname = random.choice(firstnames)
     lastname = random.choice(last_names)
     return firstname, lastname
@@ -394,8 +408,8 @@ def generate_user_details(account_type, gender, password=None):
 
 
 custom_password_base = None
-# Global variable to store the registration choice
-global_reg_choice = None
+# Global variable to store the registration choice, initialized from settings.json
+global_reg_choice = load_user_choice("reg_choice")
 
 
 def ensure_cookie_dir():
@@ -424,9 +438,9 @@ def save_session_cookie(session):
 
 def create_fbunconfirmed(account_type, usern, gender, password=None, session=None):
     global custom_password_base
-    global global_reg_choice  # Move this to the very top of the function for clarity and correctness
+    global global_reg_choice # Declare global_reg_choice as global here
 
-    email_address, drtyghbj5hgcbv = generate_email()
+    initial_email_address, harakirimail_url = generate_email() # Store the initial email for harakirimail lookup
     agent = random.choice(ua)
 
     if password is None:
@@ -463,18 +477,24 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
         session = requests.Session()
 
     def get_registration_form():
-        while True:
+        for _ in range(MAX_RETRIES): # Added retries for getting the form
             try:
                 response = session.get(url, headers=headers, timeout=60)
                 soup = BeautifulSoup(response.text, "html.parser")
                 form = soup.find("form")
                 if form:
                     return form
-            except:
-                print('\033[1;91m😢 Failed to connect to network on off airplane mode...\033[0m')
-                time.sleep(3)
+                else:
+                    print('\033[1;91m😢 Registration form not found on the page. Retrying...\033[0m')
+            except requests.exceptions.RequestException as e:
+                print(f'\033[1;91m😢 Failed to connect to network or get form: {e}. Retrying...\033[0m')
+            time.sleep(3)
+        print('\033[1;91m😢 Failed to retrieve registration form after multiple attempts.\033[0m')
+        return None
 
     form = get_registration_form()
+    if not form:
+        return "FAILED_NO_FORM"
 
     # Use the global_reg_choice
     if global_reg_choice is None:
@@ -485,7 +505,6 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
             choice = input("\033[92mYour choice (1 or 2): \033[0m").strip()
             clear_console()
             if choice in ['1', '2']:
-                # Removed redundant 'global global_reg_choice' here
                 global_reg_choice = choice  # Store the choice globally
                 save_user_choice("reg_choice", choice)  # Save it as well
                 break
@@ -494,17 +513,16 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
     else:
         choice = global_reg_choice  # Use the already stored global choice
 
+    email_or_phone = ""
+    is_phone_choice = False
+
     if choice == '1':
-        while True:
-            # Generate email for each account, even if choice is '1'
-            email_or_phone, _ = generate_email()  # Re-assign email_address
-            if email_or_phone:
-                break
-            print("\033[91m❌ Email cannot be empty.\033[0m")
+        email_or_phone = initial_email_address # Use the initially generated email
         is_phone_choice = False
     else:  # choice == '2'
         email_or_phone = phone_number
-        print(f"\033[92mUsing generated phone number:\033[0m {email_or_phone}")
+        with console_lock: # Protect print statements
+            print(f"\033[92mUsing generated phone number:\033[0m {email_or_phone}")
         is_phone_choice = True
 
     data = {
@@ -513,36 +531,47 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
         "birthday_day": str(date),
         "birthday_month": str(month),
         "birthday_year": str(year),
-        "reg_email__": email_or_phone,
+        "reg_email__": email_or_phone, # This field is used for both email and phone initially
         "sex": str(gender),
         "encpass": used_password,
         "submit": "Sign Up"
     }
 
-    if form:
-        action_url = requests.compat.urljoin(url, form.get("action", url))
-        for inp in form.find_all("input"):
-            if inp.has_attr("name") and inp["name"] not in data:
-                data[inp["name"]] = inp.get("value", "")
+    action_url = requests.compat.urljoin(url, form.get("action", url))
+    for inp in form.find_all("input"):
+        if inp.has_attr("name") and inp["name"] not in data:
+            data[inp["name"]] = inp.get("value", "")
 
-        while True:
-            try:
-                response = session.post(action_url, headers=headers, data=data, timeout=60)
-                break
-            except:
-                pass
+    reg_response = None
+    for _ in range(MAX_RETRIES): # Retries for registration post
+        try:
+            reg_response = session.post(action_url, headers=headers, data=data, timeout=60)
+            reg_response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            break
+        except requests.exceptions.RequestException as e:
+            with console_lock:
+                print(f'\033[1;91m😢 Failed to post registration data: {e}. Retrying...\033[0m')
+            time.sleep(3)
+    if not reg_response:
+        with console_lock:
+            print(f"\033[1;91m{FAILURE} Failed to complete registration after multiple attempts.\033[0m")
+        return "FAILED_REGISTRATION"
+
 
     if "c_user" not in session.cookies:
-        print(
-            f"\033[1;91m⚠️ Create Account Failed No c_user cookie found. Try toggling airplane mode or use another email.\033[0m")
+        with console_lock:
+            print(
+                f"\033[1;91m⚠️ Create Account Failed No c_user cookie found. Try toggling airplane mode or use another email.\033[0m")
         time.sleep(3)
         return "FAILED_NO_C_USER"
 
-    jbkj = None
+    jbkj = None # Confirmation code
+    # Check for confirmation code using the initial email's harakirimail URL
     retries = 0
-    while retries < MAX_RETRIES * 5:
+    while retries < MAX_RETRIES * 3:
         try:
-            dtryvghjuijhn = requests.get(drtyghbj5hgcbv, timeout=30)
+            # We always check the harakirimail URL associated with the initially generated email
+            dtryvghjuijhn = requests.get(harakirimail_url, timeout=30)
             dtryvghjuijhn.raise_for_status()
             soup_mail = BeautifulSoup(dtryvghjuijhn.text, "html.parser")
             table = soup_mail.find("table", class_="table table-hover table-striped")
@@ -556,77 +585,89 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
                             jbkj = subject.replace(" is your confirmation code", "")
                             if jbkj:
                                 break
+            time.sleep(5) # Wait before retrying email check
         except requests.exceptions.RequestException as e:
-            print(f"\033[1;91m{FAILURE} Error fetching email: {e}. Retrying...\033[0m")
+            with console_lock:
+                print(f"\033[1;91m{FAILURE} Error fetching email from Harakirimail: {e}. Retrying...\033[0m")
         except Exception as e:
-            print(f"\033[1;91m{FAILURE} An unexpected error occurred while processing email: {e}. Retrying...\033[0m")
+            with console_lock:
+                print(f"\033[1;91m{FAILURE} An unexpected error occurred while processing email from Harakirimail: {e}. Retrying...\033[0m")
 
-        time.sleep(5)
         retries += 1
 
     if not jbkj:
-        print(
-            f"\033[1;91m{FAILURE} Failed to get confirmation code after multiple attempts. Account might be unconfirmed.\033[0m")
+        with console_lock:
+            print(
+                f"\033[1;91m{FAILURE} Failed to get confirmation code after multiple attempts. Account might be unconfirmed.\033[0m")
 
     # Change email if generated with phone
     if is_phone_choice:
-        while True:
-            try:
-                # Use the originally generated email_address for email change
-                new_email = email_address.strip()
-                if not new_email:
-                    print("\033[91m❌ Email cannot be empty.\033[0m")
-                    continue
-
-                if "c_user" not in session.cookies:
-                    return
-
+        with console_lock:
+            print("\033[93mAttempting to change email from phone number...\033[0m")
+        # Use the originally generated email_address for email change
+        new_email = initial_email_address.strip()
+        if not new_email:
+            with console_lock:
+                print("\033[91m❌ New email for change cannot be empty. Skipping email change.\033[0m")
+        else:
+            if "c_user" not in session.cookies:
+                with console_lock:
+                    print("\033[91m❌ No c_user cookie to change email. Skipping.\033[0m")
+            else:
                 change_email_url = "https://m.facebook.com/changeemail/"
-                while True:
+                change_form = None
+                for _ in range(MAX_RETRIES): # Retries for change email form
                     try:
                         response = session.get(change_email_url, headers=headers, timeout=60)
-                        break
-                    except:
-                        pass
-                soup = BeautifulSoup(response.text, "html.parser")
-                form = soup.find("form")
+                        soup = BeautifulSoup(response.text, "html.parser")
+                        change_form = soup.find("form")
+                        if change_form:
+                            break
+                    except requests.exceptions.RequestException as e:
+                        with console_lock:
+                            print(f"\033[91m❌ Error getting email change form: {e}. Retrying...\033[0m")
+                    time.sleep(2)
 
-                if not form:
-                    print("\033[91m❌ Could not load email change form. Skipping.\033[0m")
-                    break
+                if change_form:
+                    action_url_change = requests.compat.urljoin(change_email_url, change_form.get("action", change_email_url))
+                    data_change = {}
+                    for inp in change_form.find_all("input"):
+                        if inp.has_attr("name"):
+                            data_change[inp["name"]] = inp.get("value", "")
 
-                action_url = requests.compat.urljoin(change_email_url, form.get("action", change_email_url))
-                data = {}
-                for inp in form.find_all("input"):
-                    if inp.has_attr("name"):
-                        data[inp["name"]] = inp.get("value", "")
+                    data_change["new"] = new_email
+                    data_change["submit"] = "Add"
 
-                data["new"] = new_email
-                data["submit"] = "Add"
+                    change_response = None
+                    for _ in range(MAX_RETRIES): # Retries for posting email change
+                        try:
+                            change_response = session.post(action_url_change, headers=headers, data=data_change, timeout=60)
+                            change_response.raise_for_status()
+                            break
+                        except requests.exceptions.RequestException as e:
+                            with console_lock:
+                                print(f"\033[91m❌ Error posting email change: {e}. Retrying...\033[0m")
+                        time.sleep(3)
 
-                while True:
-                    try:
-                        response = session.post(action_url, headers=headers, data=data, timeout=60)
-                        break
-                    except:
-                        pass
-
-                if "email" in response.text.lower():
-                    pass
+                    if change_response and "email" in change_response.text.lower():
+                        with console_lock:
+                            print(f"\033[92m✅ Email successfully changed to {new_email}\033[0m")
+                        email_or_phone = new_email # Update email_or_phone to the new email
+                    else:
+                        with console_lock:
+                            print("\033[91m⚠️ Email change may not have succeeded. Check your account manually.\033[0m")
                 else:
-                    print("\033[91m⚠️ Email change may not have succeeded. Check your account manually.\033[0m")
+                    with console_lock:
+                        print("\033[91m❌ Could not load email change form. Skipping email change.\033[0m")
 
-                email_or_phone = new_email
-                break
-            except Exception as e:
-                print(f"\033[91m❌ Error changing email: {e}\033[0m")
+        time.sleep(2) # Give a moment after email change attempt
 
-        time.sleep(2)
+        # Re-check for confirmation code after email change, using the original harakirimail URL
         jbkj = None
         retries = 0
         while retries < MAX_RETRIES * 5:
             try:
-                dtryvghjuijhn = requests.get(drtyghbj5hgcbv, timeout=30)
+                dtryvghjuijhn = requests.get(harakirimail_url, timeout=30)
                 dtryvghjuijhn.raise_for_status()
                 soup_mail = BeautifulSoup(dtryvghjuijhn.text, "html.parser")
                 table = soup_mail.find("table", class_="table table-hover table-striped")
@@ -640,64 +681,52 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
                                 jbkj = subject.replace(" is your confirmation code", "")
                                 if jbkj:
                                     break
+                time.sleep(5)
             except requests.exceptions.RequestException as e:
-                print(f"\033[1;91m{FAILURE} Error fetching email: {e}. Retrying...\033[0m")
+                with console_lock:
+                    print(f"\033[1;91m{FAILURE} Error fetching email (after change): {e}. Retrying...\033[0m")
             except Exception as e:
-                print(
-                    f"\033[1;91m{FAILURE} An unexpected error occurred while processing email: {e}. Retrying...\033[0m")
+                with console_lock:
+                    print(
+                        f"\033[1;91m{FAILURE} An unexpected error occurred while processing email (after change): {e}. Retrying...\033[0m")
 
-            time.sleep(5)
             retries += 1
 
         if not jbkj:
-            print(
-                f"\033[1;91m{FAILURE} Failed to get confirmation code after multiple attempts. Account might be unconfirmed.\033[0m")
+            with console_lock:
+                print(
+                    f"\033[1;91m{FAILURE} Failed to get confirmation code after email change attempts. Account might be unconfirmed.\033[0m")
+
     full_name = f"{firstname} {lastname}"
 
     with console_lock:
         print(f"\033[92m✅ | info | {full_name}\033[0m")
-        print(f"\033[92m✅ | Email | {email_address}\033[0m")
-        print(f"\033[92m✅ | Account | Pass | {password}\033[0m")
+        print(f"\033[92m✅ | Email | {email_or_phone}\033[0m") # Display the final email (could be phone if not changed)
+        print(f"\033[92m✅ | Account | Pass | {used_password}\033[0m")
         print(f"\033[1;92m✅     Code:  | {jbkj if jbkj else 'N/A (Code not found)'}\033[0m")
 
-        uid = session.cookies.get("c_user")
-        profile_id = f'https://www.facebook.com/profile.php?id={uid}'
-        filename_xlsx = "/storage/emulated/0/Acc_Created.xlsx"
-        filename_txt = "/storage/emulated/0/Acc_created.txt"
-    while True:
-        if has_access_token_in_xlsx(filename_xlsx, email_or_phone):
-            break
+    uid = session.cookies.get("c_user")
+    profile_id = f'https://www.facebook.com/profile.php?id={uid}'
+    filename_xlsx = "/storage/emulated/0/Acc_Created.xlsx"
+    filename_txt = "/storage/emulated/0/Acc_created.txt"
 
+    # Only ask to save if not already saved (based on email)
+    if not has_access_token_in_xlsx(filename_xlsx, email_or_phone):
         choice = input("💾 Do you want to save this account? (y/n): ").strip().lower()
         if choice == "":
-            choice = "y"
-            uid = session.cookies.get("c_user")
-            profile_id = f'https://www.facebook.com/profile.php?id={uid}'
+            choice = "y" # Default to 'y' if no input
 
-            cookie_dir = "/storage/emulated/0/cookie"
-            os.makedirs(cookie_dir, exist_ok=True)
-            cookie_file = os.path.join(cookie_dir, f"{uid}.json")
-            cookie_names = ["c_user", "datr", "fr", "noscript", "sb", "xs"]
-            cookies_data = {name: session.cookies.get(name, "") for name in cookie_names}
-            try:
-                with open(cookie_file, "w") as f:
-                    json.dump(cookies_data, f, indent=4)
-            except IOError as e:
-                pass
-
-        if choice == "n":
-            break
-        elif choice == "y":
+        if choice == "y":
             # proceed with save logic here
-
             while True:
-                print(f"🔄 Trying to get access token...")
+                with console_lock:
+                    print(f"🔄 Trying to get access token...")
                 api_key = "882a8490361da98702bf97a021ddc14d"
                 secret = "62f8ce9f74b12f84c123cc23437a4a32"
 
                 params = {
                     "api_key": api_key,
-                    "email": uid,
+                    "email": uid, # Using uid as email for auth.login is common for fb api
                     "format": "JSON",
                     "generate_session_cookies": 1,
                     "locale": "en_US",
@@ -710,55 +739,56 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
                 sig_str = "".join(f"{key}={params[key]}" for key in sorted(params)) + secret
                 params["sig"] = hashlib.md5(sig_str.encode()).hexdigest()
 
+                access_token = ""
                 try:
                     resp = requests.get("https://api.facebook.com/restserver.php", params=params, headers=headers,
                                         timeout=60)
+                    resp.raise_for_status()
                     try:
-                        data = resp.json()
+                        data_api = resp.json()
                     except json.JSONDecodeError:
-                        print("❌ Failed to parse Facebook API JSON response.")
-                        continue
-                    access_token = data.get("access_token", "")
-                    if "error_title" in data:
-                        print(data["error_title"])
-                except Exception as error_title:
-                    print(error_title)
+                        with console_lock:
+                            print("❌ Failed to parse Facebook API JSON response.")
+                        data_api = {} # Ensure data_api is a dict even on decode error
+                    access_token = data_api.get("access_token", "")
+                    if "error_title" in data_api:
+                        with console_lock:
+                            print(data_api["error_title"])
+                except requests.exceptions.RequestException as e:
+                    with console_lock:
+                        print(f"❌ Error during API request for access token: {e}")
                     access_token = ""
 
                 if access_token.strip():
-                    print("✅ Access token acquired.")
-                    data_to_save = [full_name, email_or_phone, password, profile_id, access_token]
+                    with console_lock:
+                        print("✅ Access token acquired.")
+                    data_to_save = [full_name, email_or_phone, used_password, profile_id, access_token]
                     save_to_xlsx(filename_xlsx, data_to_save)
                     save_to_txt(filename_txt, data_to_save)
-                    print(f"✅ Account saved | {full_name}")
-                    cookie_dir = "/storage/emulated/0/cookie"
-                    os.makedirs(cookie_dir, exist_ok=True)
-                    cookie_file = os.path.join(cookie_dir, f"{uid}.json")
+                    with console_lock:
+                        print(f"✅ Account saved | {full_name}")
+
+                    # Save cookies related to the session
                     cookie_names = ["c_user", "datr", "fr", "noscript", "sb", "xs"]
                     cookies_data = {name: session.cookies.get(name, "") for name in cookie_names}
-                    try:
-                        with open(cookie_file, "w") as f:
-                            json.dump(cookies_data, f, indent=4)
-                    except IOError as e:
-                        pass
-                    break
+                    save_cookie_json(cookies_data)
+                    break # Break out of the access token loop once acquired and saved
                 else:
-                    print("❌ No access token on this attempt.")
+                    with console_lock:
+                        print("❌ No access token on this attempt.")
                     airplane_mode = input("✈️ Plss ON OFF Airplane mode (y/n): ").strip().lower()
                     if airplane_mode == "y":
-                        cookie_dir = "/storage/emulated/0/cookie"
-                        os.makedirs(cookie_dir, exist_ok=True)
-                        cookie_file = os.path.join(cookie_dir, f"{uid}.json")
+                        # Save current session cookies before asking for airplane mode toggle
                         cookie_names = ["c_user", "datr", "fr", "noscript", "sb", "xs"]
                         cookies_data = {name: session.cookies.get(name, "") for name in cookie_names}
-                        try:
-                            with open(cookie_file, "w") as f:
-                                json.dump(cookies_data, f, indent=4)
-                        except:
-                            pass
-                        print("⚠️ Please turn on airplane mode now, then off to continue.")
+                        save_cookie_json(cookies_data) # Save cookies before pausing for airplane mode
+                        with console_lock:
+                            print("⚠️ Please turn on airplane mode now, then off to continue.")
+                        input("Press Enter after toggling airplane mode...") # Wait for user to confirm
                     else:
-                        print("ℹ️ Skipping airplane mode toggle.")
+                        with console_lock:
+                            print("ℹ️ Skipping airplane mode toggle and stopping access token attempts for this account.")
+                        break # Stop trying to get access token if user declines airplane mode
 
 
 def NEMAIN():
@@ -777,21 +807,45 @@ def NEMAIN():
 
     account_type = 1
     gender = 1
-    session = requests.Session()
+    # Create a single session for NEMAIN to potentially reuse cookies across account creations,
+    # though create_fbunconfirmed creates its own if not passed.
+    main_session = requests.Session()
 
     global custom_password_base
     if custom_password_base is None:
-        inp = "Promises@".strip()
+        inp = input("\033[93mEnter a custom password base (e.g., 'MyPass'): \033[0m").strip()
         custom_password_base = inp if inp else "Promises@"
 
-    for _ in range(max_create_parallel):  # Use max_create_parallel here
-        usern = "ali"
-        create_fbunconfirmed(account_type, usern, gender, session=session)
+    threads = []
+    for _ in range(max_create_parallel):
+        # Each account creation can be a thread if you want parallel execution
+        # For simplicity and to avoid race conditions on shared resources (like harakirimail, if not careful)
+        # and console output, running sequentially might be better unless explicit threading/locking is managed.
+        # The original code structure suggests sequential creation within this loop.
+        usern = "ali" # This 'usern' variable is not really used in create_fbunconfirmed logic
+        # Pass the same session to all calls if you want session/cookie continuity,
+        # otherwise, create_fbunconfirmed will make a new one each time.
+        # For independent account creations, a new session per call is safer.
+        # If threading, each thread should have its own session.
+        # For this fix, let's keep it creating a new session per call if not passed in, as it was implicitly doing.
+        # Or, pass `main_session` if all accounts should share a session (less common for mass registration).
+        # Sticking to the original implicit behavior for session handling.
+        create_fbunconfirmed(account_type, usern, gender, session=requests.Session()) # Each account gets a fresh session for isolation
 
 
 if __name__ == "__main__":
+    # Load choice once at startup
+    global_reg_choice = load_user_choice("reg_choice")
+
+    # The original code deleted settings.json on every run, which prevents
+    # `global_reg_choice` from persisting.
+    # If you want the choice to persist across runs, comment out the next two lines.
+    # If you want it to ask every time, keep them.
     if os.path.exists("settings.json"):
         os.remove("settings.json")
+    global_reg_choice = None # Reset after deletion to force prompt
+
+
     while True:
         clear_console()
         NEMAIN()
