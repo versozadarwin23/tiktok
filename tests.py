@@ -10,18 +10,6 @@ import concurrent.futures
 import threading
 import hashlib  # Import the hashlib library
 
-def has_access_token_in_xlsx(filename, email_address):
-    if not os.path.exists(filename):
-        return False  # file does not exist yet
-    wb = load_workbook(filename)
-    ws = wb.active
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        saved_email = row[1]
-        saved_access_token = row[4]
-        if saved_email == email_address and saved_access_token and saved_access_token.strip():
-            return True
-    return False
-
 xlsx_lock = threading.Lock()
 console_lock = threading.Lock()
 os.system("clear")
@@ -190,7 +178,7 @@ def create_fbunconfirmed(account_num, account_type, gender, password=None, sessi
         print(f"{FAILURE} Failed to load page and find form after {MAX_RETRIES} retries. (Account #{account_num})")
         return None
 
-    url = "https://limited.facebook.com/reg?soft=hjk"
+    url = "https://m.facebook.com/reg?soft=hjk"
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",  #
         "Referer": "https://m.facebook.com/reg",  #
@@ -208,7 +196,7 @@ def create_fbunconfirmed(account_num, account_type, gender, password=None, sessi
         'accept-encoding': 'gzip, deflate',  #
         'content-type': 'application/x-www-form-urlencoded',  #
         'x-fb-http-engine': 'Liger',  #
-        'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 14; T614SP Build/UP1A.231005.007) [FBAN/Orca-Android;FBAV/513.1.0.46.107;FBPN/com.facebook.orca;FBLC/en_US;FBBV/753632239;FBCR/HOME;FBMF/TCL;FBBD/TCL;FBDV/T614SP;FBSV/14;FBCA/arm64-v8a:null;FBDM/{density=2.0,width=720,height=1489};FB_FW/1;]',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G975F Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/80.0.3987.149 Mobile Safari/537.36 [FB_IAB/Orca-Android;FBAV/256.2.0.23.117;]',
         #
     }
     if session is None:
@@ -330,13 +318,9 @@ def create_fbunconfirmed(account_num, account_type, gender, password=None, sessi
         retries += 1
 
     if not jbkj:
-        print(
-            f"\033[1;91m{FAILURE} Failed to get confirmation code for account #{account_num} after multiple attempts. Account might be unconfirmed.\033[0m")
+        print(f"\033[1;91m{FAILURE} Failed to get confirmation code for account #{account_num} after multiple attempts. Account might be unconfirmed.\033[0m")
 
     full_name = f"{firstname} {lastname}"
-    # Initialize access_token as empty string
-    access_token = ""
-
     with console_lock:
         print("\n\033[1;96m======================================\033[0m")
         print(f"\033[1;92m✅     Full Name: | {full_name} |\033[0m")
@@ -349,61 +333,16 @@ def create_fbunconfirmed(account_num, account_type, gender, password=None, sessi
         filename_xlsx = "/storage/emulated/0/Acc_Created.xlsx"
         filename_txt = "/storage/emulated/0/Acc_created.txt"
 
-        while True:
-            # Check kung may access token na sa XLSX
-            if has_access_token_in_xlsx(filename_xlsx, email_address):
-                print(f"✅ Account for {email_address} already has access token. Skipping...")
-                break
-
-            choice = input("💾 Do you want to save this account? (y/n): ").strip().lower()
-            if choice == "n":
-                break
-            elif choice == "y":
-                while True:
-                    access_token = ""
-
-                    print(f"🔄 Attempting to get access token...")
-                    api_key = "882a8490361da98702bf97a021ddc14d"
-                    secret = "62f8ce9f74b12f84c123cc23437a4a32"
-
-                    params = {
-                        "api_key": api_key,
-                        "email": uid,
-                        "format": "JSON",
-                        "generate_session_cookies": 1,
-                        "locale": "en_US",
-                        "method": "auth.login",
-                        "password": used_password,
-                        "return_ssl_resources": 1,
-                        "v": "1.0"
-                    }
-
-                    sig_str = "".join(f"{key}={params[key]}" for key in sorted(params)) + secret
-                    params["sig"] = hashlib.md5(sig_str.encode()).hexdigest()
-
-                    try:
-                        resp = requests.get("https://api.facebook.com/restserver.php", params=params, headers=headers,
-                                            timeout=60)
-                        data = resp.json()
-                        access_token = data.get("access_token", "")
-                        if "error_title" in data:
-                            print(f"⚠️  {account_num}:", data["error_title"])
-                    except Exception as error_title:
-                        print(f"⚠️  account #{account_num}:", error_title)
-
-                    if access_token.strip():
-                        print("✅ Access token acquired.")
-                        data_to_save = [full_name, email_address, password, profile_id, access_token]
-                        save_to_xlsx(filename_xlsx, data_to_save)
-                        save_to_txt(filename_txt, data_to_save)
-                        print("✅ Account saved.")
-                        break
-                    else:
-                        print("❌ No access token.")
-                        input("✈️  Please turn Airplane Mode ON/OFF and press Enter to retry...")
-
-                # Success! Exit outer loop
-                break
+        choice = input("💾 Do you want to save this account? (y/n): ").strip().lower()
+        if choice == "y":
+            data_to_save = [full_name, email_address, password, profile_id]
+            save_to_xlsx(filename_xlsx, data_to_save)
+            save_to_txt(filename_txt, data_to_save)
+            print("✅ Account saved.")
+        elif choice == "n":
+            print("Account not saved.")
+        else:
+            print("Invalid input. Please enter 'y' or 'n'.")
 
 
 def main():
