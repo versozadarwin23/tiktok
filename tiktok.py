@@ -11,17 +11,25 @@ import customtkinter as ctk
 import queue
 import random
 import concurrent.futures
-# Removed: requests, json, pathlib, re, sys, shutil, tempfile, hashlib, uuid, xml.etree.ElementTree
+import requests
+import json
+from pathlib import Path
 import re
 import sys
 import shutil
-from pathlib import Path
-import xml.etree.ElementTree as ET  # For UI Automator parsing
+import tempfile
+import hashlib
+import uuid
+import xml.etree.ElementTree as ET
 
 # --- App Version and Update URL ---
-__version__ = "1.3.9"  # Updated version number
+__version__ = "1.4.0"  # Updated version number
 UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/adbtool/refs/heads/main/main.py"
-VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/version.txt"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/adbtool/refs/heads/main/version.txt"
+
+# --- GLOBAL CONSTANTS for TikTok Lite (UPDATED) ---
+TIKTOK_LITE_PACKAGE = "com.zhiliaoapp.musically.go"
+TIKTOK_LITE_ACTIVITY = "com.ss.android.ugc.aweme.main.homepage.MainActivity"
 
 # --- Global Flag for Stopping Commands ---
 is_stop_requested = threading.Event()
@@ -34,75 +42,70 @@ def run_adb_command(command, serial):
     Returns: (bool success, str output_or_error)
     """
     if is_stop_requested.is_set():
-        # print(f"🛑 Stop signal received. Aborting command on device {serial}.")
         return False, "Stop requested."
 
     try:
-        # Popen is used to allow non-blocking check for stop signal
         process = subprocess.Popen(['adb', '-s', serial] + command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        # Wait for the command to finish or for a stop signal
         timeout_seconds = 60
         start_time = time.time()
         while process.poll() is None and (time.time() - start_time < timeout_seconds):
             if is_stop_requested.is_set():
-                process.terminate()  # Use terminate to kill the process
-                # print(f"🛑 Terminated ADB command on device {serial}.")
+                process.terminate()
                 return False, "Terminated due to stop request."
-            # time.sleep(0.1)  # Small delay to reduce CPU usage
 
         if process.poll() is None:
             process.terminate()
-            # Terminate the process if it timed out and raise the error
             raise subprocess.TimeoutExpired(cmd=['adb', '-s', serial] + command, timeout=timeout_seconds)
 
         stdout, stderr = process.communicate()
 
         if process.returncode != 0:
-            # print(f"❌ Error executing command on device {serial}: {stderr.decode()}")
             return False, stderr.decode()
         else:
-            # print(f"✅ Command executed on device {serial}: {' '.join(command)}")
             return True, stdout.decode()
 
     except subprocess.CalledProcessError as e:
-        # print(f"❌ Error executing command on device {serial}: {e.stderr.decode()}")
         return False, e.stderr.decode()
     except FileNotFoundError:
-        # print(f"❌ ADB not found. Please install it and add to PATH.")
         return False, "ADB not found. Please install it and add to PATH."
     except subprocess.TimeoutExpired:
-        # print(f"❌ Command timed out on device {serial}")
         return False, "Command timed out."
     except Exception as e:
-        # print(f"❌ General error on device {serial}: {e}")
         return False, str(e)
 
 
 def run_text_command(text_to_send, serial):
     """
-    Sends a specific text string as individual ADB text commands with a delay.
+    Sends a specific text string character-by-character with delay and proper space escaping.
     """
     if is_stop_requested.is_set():
-        # print(f"🛑 Stop signal received. Aborting text command on device {serial}.")
         return
 
     if not text_to_send:
-        # print(f"Text is empty. Cannot send command to {serial}.")
         return
 
-    # Replace spaces with %s for ADB
-    # ADB shell input text handles quotes, so we'll wrap the whole thing
-    # This is often more reliable than char-by-char for long text
-    formatted_text = text_to_send.replace(" ", "%s")
+    formatted_text = text_to_send
+    DELAY_PER_CHAR = 0.02
 
     try:
-        command = ['shell', 'input', 'text', formatted_text]
-        subprocess.run(['adb', '-s', serial] + command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       check=True, timeout=15)
+        for char in formatted_text:
+            if is_stop_requested.is_set():
+                return
 
-    except Exception as e:
-        # print(f"An error occurred on device {serial}: {e}")
+            adb_char = char.replace(' ', '%s')
+
+            command_args = ['shell', 'input', 'text', adb_char]
+
+            subprocess.run(['adb', '-s', serial] + command_args,
+                           stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL,
+                           check=True,
+                           timeout=5)
+
+            time.sleep(DELAY_PER_CHAR)
+
+    except Exception:
         pass
 
 
@@ -127,24 +130,37 @@ class AdbControllerApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # --- Configuration for Minimalist Tech Look ---
-        self.title(f"ADB BY DARS: V{__version__}")
-        # Removed fullscreen attribute. Set initial size and start zoomed/maximized.
-        self.geometry("1200x800")
+        # --- Configuration ---
+        self.title(f"TikTok Lite ADB Commander V{__version__}")
+        self.geometry("1400x900")
         self.state('zoomed')
         ctk.set_appearance_mode("Dark")
         ctk.set_default_color_theme("blue")
 
-        # Minimalist Tech Color Palette
-        self.ACCENT_COLOR = "#FFFFFF"  # Primary control accent (White/Light Gray)
-        self.ACCENT_HOVER = "#A9A9A9"  # Lighter hover state
-        self.DANGER_COLOR = "#FF6347"  # Tomato Red for clear warnings/stops
-        self.SUCCESS_COLOR = "#00FF7F"  # Spring Green for success/install
-        self.WARNING_COLOR = "#FFA500"  # Orange for power/reboot
-        self.BACKGROUND_COLOR = "#181818"  # Ultra dark background
-        self.FRAME_COLOR = "#2C2C2C"  # Clear separation for internal frames
-        self.TEXT_COLOR = "#E0E0E0"  # Off-white text
+        # --- NEW TikTok Neon Dark Theme Palette ---
+        self.COLOR_BACKGROUND = "#000000"
+        self.COLOR_FRAME = "#1A1A1A"
+        self.COLOR_BORDER = "#333333"
+        self.COLOR_ACCENT = "#FF0050"  # Electric Pink/TikTok Red
+        self.COLOR_ACCENT_HOVER = "#FF3377"
+        self.COLOR_SUCCESS = "#00FFFF"  # Cyan
+        self.COLOR_SUCCESS_HOVER = "#33FFFF"
+        self.COLOR_DANGER = "#FF6600"  # Warning Orange
+        self.COLOR_DANGER_HOVER = "#FF8533"
+        self.COLOR_WARNING = "#FFFF00"
+        self.COLOR_TEXT_PRIMARY = "#FFFFFF"
+        self.COLOR_TEXT_SECONDARY = "#AAAAAA"
 
+        # --- NEW Standardized Fonts (Larger and modern) ---
+        self.FONT_TITLE = ctk.CTkFont(family="Consolas", size=36, weight="bold")
+        self.FONT_HEADING = ctk.CTkFont(family="Consolas", size=20, weight="bold")
+        self.FONT_SUBHEADING = ctk.CTkFont(family="Consolas", size=18, weight="bold")
+        self.FONT_BODY = ctk.CTkFont(family="Consolas", size=16)
+        self.FONT_BUTTON = ctk.CTkFont(family="Consolas", size=16, weight="bold")
+        self.FONT_MONO = ctk.CTkFont(family="Consolas", size=16)
+        self.FONT_STATUS = ctk.CTkFont(family="Consolas", size=14, weight="normal")
+
+        # --- App State Variables ---
         self.device_frames = {}
         self.device_canvases = {}
         self.device_images = {}
@@ -159,142 +175,238 @@ class AdbControllerApp(ctk.CTk):
         self.capture_thread = None
         self.update_image_id = None
         self.is_capturing = False
-        self.apk_path = None  # New variable for APK installation
-        self.is_muted = False  # State for volume control
-        self.update_check_job = None  # New attribute for scheduled check
-
-        # NEW: State for auto-typing loop
+        self.apk_path = None
+        self.is_muted = False
+        self.update_check_job = None
+        self.is_update_prompt_showing = False
+        self.share_pairs = []
+        self.share_pair_frame = None
         self.is_auto_typing = threading.Event()
-        self.file_path_entry = None  # Text Command file path entry
-        self.find_click_type_button = None  # Auto-Type button
 
-        # Use a higher max_workers count as I/O operations (ADB) are often blocking
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count() * 4)
 
-        # Main window grid configuration: 1/4 size for Control Panel, 3/4 for Device View
-        self.grid_columnconfigure(0, weight=1, minsize=600)  # Control Panel (Left)
-        self.grid_columnconfigure(1, weight=3)  # Device View (Right)
+        # --- Main Window Grid Configuration ---
+        self.grid_columnconfigure(0, weight=1, minsize=500)
+        self.grid_columnconfigure(1, weight=3)
         self.grid_rowconfigure(0, weight=1)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.configure(fg_color=self.COLOR_BACKGROUND)
 
-        # --- Control Panel Setup (Left) ---
-        self.control_panel = ctk.CTkFrame(self, corner_radius=15, fg_color=self.FRAME_COLOR)
-        self.control_panel.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+        # --- [LEFT] Control Panel Setup ---
+        self.control_panel = ctk.CTkFrame(self, corner_radius=0, fg_color=self.COLOR_FRAME)
+        self.control_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 1), pady=0)
+
         self.control_panel.grid_columnconfigure(0, weight=1)
+        self.control_panel.grid_rowconfigure(4, weight=1)
+        self.control_panel.grid_rowconfigure(5, weight=0)
 
-        self.control_panel_scrollable = ctk.CTkScrollableFrame(self.control_panel, fg_color="transparent")
-        self.control_panel_scrollable.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        self.control_panel_scrollable.grid_columnconfigure(0, weight=1)
+        # --- Row 0: Title ---
+        ctk.CTkLabel(self.control_panel, text=f"TIKTOK LITE COMMANDER V{__version__}",
+                     font=self.FONT_TITLE,
+                     text_color=self.COLOR_ACCENT).grid(
+            row=0, column=0, pady=(20, 10), padx=25, sticky='w')
 
-        # Title - White and bold
-        ctk.CTkLabel(self.control_panel_scrollable, text=f"ADB TOOL BY DARS: V{__version__}",
-                     font=ctk.CTkFont(size=36, weight="bold"),
-                     text_color=self.ACCENT_COLOR).grid(
-            row=0, column=0, pady=(20, 10), sticky='ew', padx=25)
+        # --- Row 1: Global Stop Button ---
+        self.stop_all_button = ctk.CTkButton(self.control_panel, text="🛑 TERMINATE ALL OPERATIONS 🛑",
+                                             command=self.stop_all_commands,
+                                             fg_color=self.COLOR_DANGER,
+                                             hover_color=self.COLOR_DANGER_HOVER,
+                                             text_color=self.COLOR_TEXT_PRIMARY,
+                                             corner_radius=8,
+                                             font=self.FONT_HEADING, height=60)
+        self.stop_all_button.grid(row=1, column=0, sticky='ew', padx=25, pady=15)
 
-        # Separator - Distinct white line
-        ctk.CTkFrame(self.control_panel_scrollable, height=2, fg_color=self.ACCENT_COLOR).grid(row=1, column=0,
-                                                                                               sticky='ew',
-                                                                                               padx=25, pady=15)
+        # --- Row 2: Device Management Frame (Simplified/Restructured) ---
+        device_mgmt_frame = ctk.CTkFrame(self.control_panel, fg_color="transparent")
+        device_mgmt_frame.grid(row=2, column=0, sticky="ew", padx=25, pady=(10, 5))
+        device_mgmt_frame.grid_columnconfigure(0, weight=1)
+        device_mgmt_frame.grid_columnconfigure(1, weight=1)
+        device_mgmt_frame.grid_columnconfigure(2, weight=1)
 
-        # Device Management Section
-        device_section_frame = ctk.CTkFrame(self.control_panel_scrollable, fg_color="transparent")
-        device_section_frame.grid(row=2, column=0, sticky="ew", padx=25, pady=5)
-        device_section_frame.grid_columnconfigure(0, weight=1)
-        device_section_frame.grid_columnconfigure(1, weight=1)
+        self.device_count_label = ctk.CTkLabel(device_mgmt_frame, text="DEVICES: 0",
+                                               font=self.FONT_SUBHEADING, text_color=self.COLOR_TEXT_SECONDARY)
+        self.device_count_label.grid(row=0, column=0, sticky='w', padx=(0, 10))
 
-        self.device_count_label = ctk.CTkLabel(device_section_frame, text="DEVICES: 0",
-                                               font=ctk.CTkFont(size=16, weight="bold"), text_color=self.TEXT_COLOR)
-        self.device_count_label.grid(row=0, column=0, sticky='w', pady=(0, 5))
+        self.detect_button = ctk.CTkButton(device_mgmt_frame, text="🔄 REFRESH", command=self.detect_devices,
+                                           corner_radius=8,
+                                           fg_color=self.COLOR_ACCENT,
+                                           hover_color=self.COLOR_ACCENT_HOVER,
+                                           font=self.FONT_BUTTON, height=45, text_color=self.COLOR_BACKGROUND)
+        self.detect_button.grid(row=0, column=1, sticky='ew', padx=(5, 5))
 
-        self.detect_button = ctk.CTkButton(device_section_frame, text="REFRESH", command=self.detect_devices,
-                                           width=120, corner_radius=8, fg_color="#3A3A3A", hover_color="#555555",
-                                           font=ctk.CTkFont(size=14, weight="bold"), border_color=self.ACCENT_COLOR,
-                                           border_width=1)
-        self.detect_button.grid(row=0, column=1, sticky='e', pady=(0, 5))
-
-        # Removed 'requests' so update check/button is non-functional without it, but keeping the button for completeness (and assuming the actual file includes 'requests')
-        # However, to meet the strict requirement of *removal* based on the provided code structure, I must remove the update logic/button if 'requests' is not in the imports,
-        # but since 'requests' was in the *original* snippet and is needed for the *original* update logic, I'll re-add it if needed for the core functionality you want to keep.
-        # RETAINING THE UPDATE BUTTON/LOGIC (for now), as it's a core system utility, but you only asked to remove *other* tabs/functionality.
-
-        # Re-adding `requests` for the update check logic, which is a core system utility.
-        import requests
-
-        self.update_button = ctk.CTkButton(device_section_frame, text=f"UPDATE NOW (V{__version__})",
+        self.update_button = ctk.CTkButton(device_mgmt_frame, text=f"📥 UPDATE (V{__version__})",
                                            command=self.update_app,
-                                           fg_color="#444444", hover_color="#666666", corner_radius=8,
-                                           font=ctk.CTkFont(size=14, weight="bold"), height=35,
-                                           text_color=self.ACCENT_COLOR)
-        self.update_button.grid(row=1, column=0, columnspan=2, sticky='ew', pady=(5, 10))
+                                           fg_color="transparent", hover_color=self.COLOR_BORDER, corner_radius=8,
+                                           font=self.FONT_BUTTON,
+                                           text_color=self.COLOR_SUCCESS, border_color=self.COLOR_SUCCESS,
+                                           border_width=2,
+                                           height=45)
+        self.update_button.grid(row=0, column=2, sticky='e', padx=(5, 0))
 
-        # Device List - Light text on dark background with clear selection highlight
-        self.device_listbox = tk.Listbox(self.control_panel_scrollable, height=6, font=("Consolas", 14),
-                                         # Mono font for tech feel
-                                         bg=self.BACKGROUND_COLOR, fg=self.SUCCESS_COLOR,
-                                         selectbackground=self.ACCENT_COLOR,
-                                         selectforeground="#101010", borderwidth=0, highlightthickness=1,
-                                         highlightcolor=self.ACCENT_COLOR, relief='flat')
-        self.device_listbox.grid(row=3, column=0, sticky='ew', padx=25, pady=(5, 20))
-        self.device_listbox.bind('<<ListboxSelect>>', self.on_device_select)
+        # --- Row 3: Device Selection ---
+        device_select_frame = ctk.CTkFrame(self.control_panel, fg_color="transparent")
+        device_select_frame.grid(row=3, column=0, sticky="ew", padx=25, pady=5)
+        device_select_frame.grid_columnconfigure(1, weight=1)
 
-        # Tab View - Only ADB Utilities and TikTok remain
-        self.tab_view = ctk.CTkTabview(self.control_panel_scrollable,
-                                       segmented_button_selected_color=self.ACCENT_COLOR,
-                                       segmented_button_selected_hover_color=self.ACCENT_HOVER,
-                                       segmented_button_unselected_hover_color="#3A3A3A",
-                                       segmented_button_unselected_color=self.FRAME_COLOR,
-                                       text_color=self.TEXT_COLOR,
-                                       corner_radius=10,
-                                       height=550)
-        self.tab_view.grid(row=4, column=0, sticky="nsew", padx=25, pady=10)
+        ctk.CTkLabel(device_select_frame, text="LIVE VIEW:",
+                     font=self.FONT_BUTTON, text_color=self.COLOR_TEXT_SECONDARY).grid(row=0, column=0, sticky='w')
 
-        self.tab_view.add("ADB Utilities")
-        self.tab_view.add("TikTok")
+        self.device_selector_var = ctk.StringVar(value="No devices found")
+        self.device_option_menu = ctk.CTkOptionMenu(device_select_frame,
+                                                    variable=self.device_selector_var,
+                                                    command=self.on_device_select_menu,
+                                                    values=["No devices found"],
+                                                    state="disabled",
+                                                    font=self.FONT_MONO,
+                                                    dropdown_font=self.FONT_MONO,
+                                                    fg_color=self.COLOR_FRAME,
+                                                    button_color=self.COLOR_BORDER,
+                                                    button_hover_color=self.COLOR_ACCENT,
+                                                    dropdown_fg_color=self.COLOR_FRAME,
+                                                    dropdown_hover_color=self.COLOR_BORDER,
+                                                    corner_radius=8,
+                                                    height=45)
+        self.device_option_menu.grid(row=0, column=1, sticky='ew', padx=(15, 0))
 
-        # Set default tab to ADB Utilities
-        self.tab_view.set("ADB Utilities")
+        # --- Row 4: Tab View ---
+        self.tab_view = ctk.CTkTabview(self.control_panel,
+                                       fg_color=self.COLOR_FRAME,
+                                       segmented_button_selected_color=self.COLOR_ACCENT,
+                                       segmented_button_selected_hover_color=self.COLOR_ACCENT_HOVER,
+                                       segmented_button_unselected_hover_color=self.COLOR_BORDER,
+                                       segmented_button_unselected_color=self.COLOR_FRAME,
+                                       text_color=self.COLOR_TEXT_PRIMARY,
+                                       border_color=self.COLOR_BORDER,
+                                       border_width=2,
+                                       corner_radius=8)
+        self.tab_view.grid(row=4, column=0, sticky="nsew", padx=25, pady=15)
+
+        self.tab_view.add("TIKTOK AUTOMATION")
+        self.tab_view.add("UTILITIES")
+        self.tab_view.set("TIKTOK AUTOMATION")
 
         self._configure_tab_layouts()
 
-        # Status Bar - Thicker status bar at the bottom
-        self.status_label = ctk.CTkLabel(self.control_panel_scrollable, text="Awaiting Command...", anchor='w',
-                                         font=("Consolas", 15, "italic"), text_color="#A9A9A9", height=40)
-        self.status_label.grid(row=5, column=0, sticky='ew', padx=25, pady=(10, 0))
+        # --- Row 5: Status Bar ---
+        self.status_label = ctk.CTkLabel(self.control_panel, text="Awaiting Command...", anchor='w',
+                                         font=self.FONT_STATUS, text_color=self.COLOR_TEXT_SECONDARY, height=35,
+                                         fg_color=self.COLOR_FRAME)
+        self.status_label.grid(row=5, column=0, sticky='sew', padx=25, pady=(5, 15))
 
-        # --- Device View Panel Setup (Right) ---
-        self.device_view_panel = ctk.CTkFrame(self, fg_color=self.BACKGROUND_COLOR, corner_radius=15)
-        self.device_view_panel.grid(row=0, column=1, sticky="nsew", padx=(0, 20), pady=20)
+        # --- [RIGHT] Device View Panel Setup ---
+        self.device_view_panel = ctk.CTkFrame(self, fg_color=self.COLOR_BACKGROUND, corner_radius=0)
+        self.device_view_panel.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
         self.device_view_panel.grid_columnconfigure(0, weight=1)
         self.device_view_panel.grid_rowconfigure(0, weight=1)
 
-        self.stop_all_button = ctk.CTkButton(self.device_view_panel, text="TERMINATE ALL OPERATIONS",
-                                             command=self.stop_all_commands, fg_color=self.DANGER_COLOR,
-                                             hover_color="#CC301A", text_color=self.ACCENT_COLOR, corner_radius=10,
-                                             font=ctk.CTkFont(size=18, weight="bold"), height=60)
-        self.stop_all_button.pack(side="bottom", fill="x", padx=15, pady=(0, 15))
-
+        # --- Initial Setup ---
         self.detect_devices()
-        # Requires 'requests'
-        # self.check_for_updates()
-        # self.start_periodic_update_check()
+        self.check_for_updates()
+        self.start_periodic_update_check()
 
-    # --- New Methods for GET TOKEN Tab --- (REMOVED)
+    # --- Section Helper for Professional Look ---
+    def _create_section_header(self, parent, text, row):
+        """Creates a standardized, styled section header using Cyan for highlight."""
+        ctk.CTkLabel(parent, text=f"• {text} •",
+                     font=self.FONT_HEADING, text_color=self.COLOR_SUCCESS).grid(
+            row=row, column=0, sticky='w', padx=15, pady=(20, 5))
 
-    # NEW METHOD: Setup periodic update check (REMOVED)
-    # def start_periodic_update_check(self):
-    # def _periodic_check_updates(self):
-    # def _check_and_reschedule(self):
+    def _create_section_frame(self, parent, row):
+        """Creates a standardized frame for grouping widgets."""
+        frame = ctk.CTkFrame(parent, fg_color=self.COLOR_FRAME, corner_radius=12,
+                             border_width=1, border_color=self.COLOR_BORDER)
+        frame.grid(row=row, column=0, sticky='ew', padx=15, pady=5)
+        frame.grid_columnconfigure(0, weight=1)
+        return frame
 
-    # Keeping check_for_updates and ask_for_update as they rely on the external 'requests' library
-    # The actual implementation of these methods remains unchanged from the original.
+    # --- Configuration Methods (Unchanged Logic) ---
+
+    def start_periodic_update_check(self):
+        self.update_check_job = self.after(60000, self._periodic_check_updates)
+
+    def _periodic_check_updates(self):
+        threading.Thread(target=self._check_and_reschedule, daemon=True).start()
+
+    def _check_and_reschedule(self):
+        try:
+            response = requests.get(VERSION_CHECK_URL, timeout=10)
+            response.raise_for_status()
+
+            latest_version = response.text.strip()
+            try:
+                local_v = float(__version__)
+                remote_v = float(latest_version)
+
+                if remote_v > local_v:
+                    self.after(0, self.ask_for_update, latest_version)
+            except ValueError:
+                if latest_version > __version__:
+                    self.after(0, self.ask_for_update, latest_version)
+        except requests.exceptions.RequestException:
+            pass
+        except Exception:
+            pass
+        finally:
+            self.update_check_job = self.after(60000, self._periodic_check_updates)
+
+    def check_for_updates(self):
+        def _check_in_thread():
+            try:
+                response = requests.get(VERSION_CHECK_URL, timeout=10)
+                response.raise_for_status()
+
+                latest_version = response.text.strip()
+                try:
+                    local_v = float(__version__)
+                    remote_v = float(latest_version)
+
+                    if remote_v > local_v:
+                        self.after(0, self.ask_for_update, latest_version)
+                except ValueError:
+                    if latest_version > __version__:
+                        self.after(0, self.ask_for_update, latest_version)
+
+            except requests.exceptions.HTTPError:
+                self.after(0, lambda: self.status_label.configure(
+                    text=f"❌ ERROR: Failed to check for update. HTTP Error.",
+                    text_color=self.COLOR_DANGER))
+            except requests.exceptions.RequestException:
+                self.after(0, lambda: self.status_label.configure(
+                    text="❌ ERROR: Failed to check for update. Connection Error.",
+                    text_color=self.COLOR_DANGER))
+            except Exception:
+                self.after(0, lambda: self.status_label.configure(
+                    text="❌ ERROR: An unexpected error occurred during version check.",
+                    text_color=self.COLOR_DANGER))
+
+        update_thread = threading.Thread(target=_check_in_thread, daemon=True)
+        update_thread.start()
+
+    def ask_for_update(self, latest_version):
+        if self.is_update_prompt_showing:
+            return
+
+        try:
+            self.is_update_prompt_showing = True
+            title = "New TikTok Lite Commander Update!"
+            # --- TRANSLATED TO ENGLISH ---
+            message = (
+                f"A new version ({latest_version}) is available!\n\n"
+                "It features improved performance and new functionalities.\n\n"
+                "The application will close and restart to apply the update. Update now?"
+            )
+            # --- END TRANSLATED ---
+
+            response = messagebox.askyesno(title, message)
+            if response:
+                self.update_app()
+        finally:
+            self.is_update_prompt_showing = False
 
     def on_closing(self):
-        # Cancel the periodic update check job
         if self.update_check_job:
             self.after_cancel(self.update_check_job)
 
-        # Stop all threads
         self.is_auto_typing.clear()
         is_stop_requested.set()
 
@@ -303,381 +415,209 @@ class AdbControllerApp(ctk.CTk):
         self.destroy()
 
     def _configure_tab_layouts(self):
-        """Helper method to configure the grid layout for each tab with improved spacing."""
+        """
+        Configures the grid layout for each tab using the Neon Dark design with DISTINCT sizing/layout.
+        """
 
-        # --- ADB Utilities Tab (REFINED Minimalist Layout) ---
-        utility_frame = self.tab_view.tab("ADB Utilities")
+        # --- Configure "TIKTOK AUTOMATION" Tab ---
+        tiktok_tab_container = self.tab_view.tab("TIKTOK AUTOMATION")
+
+        tiktok_frame = ctk.CTkScrollableFrame(tiktok_tab_container, fg_color="transparent")
+        tiktok_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        tiktok_frame.columnconfigure(0, weight=1)
+
+        # --- Section: App Control (STACKED, LARGER BUTTONS) ---
+        self._create_section_header(tiktok_frame, "TIKTOK APP CONTROL", 0)
+        tiktok_app_frame = self._create_section_frame(tiktok_frame, 1)
+        tiktok_app_frame.columnconfigure(0, weight=1)
+
+        # Launch button uses Cyan (Success) and is full width
+        self.launch_tiktok_lite_button = ctk.CTkButton(tiktok_app_frame, text="🚀 LAUNCH TIKTOK LITE",
+                                                       command=self.launch_tiktok_lite,
+                                                       corner_radius=10, fg_color=self.COLOR_SUCCESS,
+                                                       hover_color=self.COLOR_SUCCESS_HOVER,
+                                                       height=55, font=self.FONT_HEADING,
+                                                       text_color=self.COLOR_BACKGROUND)
+        self.launch_tiktok_lite_button.grid(row=0, column=0, sticky='ew', padx=15, pady=(15, 5))
+
+        # Force Stop button uses Danger (Orange) and is full width
+        self.force_stop_tiktok_lite_button = ctk.CTkButton(tiktok_app_frame, text="🛑 FORCE STOP TIKTOK",
+                                                           command=self.force_stop_tiktok_lite,
+                                                           fg_color=self.COLOR_DANGER,
+                                                           hover_color=self.COLOR_DANGER_HOVER, corner_radius=10,
+                                                           text_color=self.COLOR_TEXT_PRIMARY, height=55,
+                                                           font=self.FONT_HEADING)
+        self.force_stop_tiktok_lite_button.grid(row=1, column=0, sticky='ew', padx=15, pady=(5, 15))
+
+        # --- Section: Single Video Visit (LARGER ENTRY) ---
+        self._create_section_header(tiktok_frame, "SINGLE VIDEO VISIT", 2)
+        tiktok_single_frame = self._create_section_frame(tiktok_frame, 3)
+
+        self.tiktok_url_entry = ctk.CTkEntry(tiktok_single_frame, placeholder_text="Enter TikTok URL...", height=50,
+                                             corner_radius=10, font=self.FONT_BODY,
+                                             fg_color=self.COLOR_FRAME, border_color=self.COLOR_ACCENT, border_width=2)
+        self.tiktok_url_entry.grid(row=0, column=0, sticky='ew', padx=15, pady=(15, 10))
+
+        # Visit button uses Accent color (Pink)
+        self.tiktok_button = ctk.CTkButton(tiktok_single_frame, text="▶️ VISIT VIDEO (DEEPLINK)",
+                                           command=self.open_tiktok_lite_deeplink,
+                                           fg_color=self.COLOR_ACCENT, hover_color=self.COLOR_ACCENT_HOVER, height=50,
+                                           font=self.FONT_BUTTON, corner_radius=10, text_color=self.COLOR_BACKGROUND)
+        self.tiktok_button.grid(row=1, column=0, sticky='ew', padx=15, pady=(10, 15))
+
+        # --- Section: Multi-Video Automation ---
+        self._create_section_header(tiktok_frame, "MULTI-LINK & COMMENT PAIRS", 4)
+
+        # Container para sa mga dynamic na entry
+        self.share_pair_frame = ctk.CTkScrollableFrame(tiktok_frame, fg_color=self.COLOR_FRAME, height=200,
+                                                       corner_radius=12, border_color=self.COLOR_BORDER, border_width=1)
+        self.share_pair_frame.grid(row=5, column=0, sticky='ew', padx=15, pady=5)
+        self.share_pair_frame.columnconfigure(0, weight=1)
+
+        # Add Link/Caption Button uses Cyan (Success) and is larger
+        add_link_button = ctk.CTkButton(tiktok_frame, text="➕ ADD LINK / COMMENT PAIR", command=self.add_share_pair,
+                                        fg_color=self.COLOR_SUCCESS, hover_color=self.COLOR_SUCCESS_HOVER, height=50,
+                                        font=self.FONT_BUTTON, corner_radius=10,
+                                        text_color=self.COLOR_BACKGROUND)
+        add_link_button.grid(row=6, column=0, sticky='ew', padx=15, pady=(10, 15))
+
+        # Initial pair upon startup
+        self.add_share_pair(is_initial=True)
+
+        # --- Section: Automation Actions ---
+        self._create_section_header(tiktok_frame, "TEXT FILE TOOLS", 7)
+        action_frame = self._create_section_frame(tiktok_frame, 8)
+        action_frame.columnconfigure(0, weight=1)
+        action_frame.columnconfigure(1, weight=1)
+
+        self.send_button = ctk.CTkButton(action_frame, text="RANDOM TEXT ✉️",
+                                         command=self.send_text_to_devices,
+                                         fg_color=self.COLOR_BORDER, hover_color=self.COLOR_TEXT_SECONDARY, height=50,
+                                         font=self.FONT_BUTTON, text_color=self.COLOR_TEXT_PRIMARY,
+                                         corner_radius=10)
+        self.send_button.grid(row=0, column=0, sticky='ew', padx=(15, 7), pady=15)
+
+        self.remove_emoji_button = ctk.CTkButton(action_frame, text="REMOVE EMOJIS 🚫",
+                                                 command=self.remove_emojis_from_file,
+                                                 fg_color=self.COLOR_DANGER, hover_color=self.COLOR_DANGER_HOVER,
+                                                 height=50,
+                                                 font=self.FONT_BUTTON,
+                                                 text_color=self.COLOR_TEXT_PRIMARY, corner_radius=10)
+        self.remove_emoji_button.grid(row=0, column=1, sticky='ew', padx=(7, 15), pady=15)
+
+        # --- Prominent "START AUTO-TYPE" Button (LARGER FONT) ---
+        self.find_click_type_button = ctk.CTkButton(tiktok_frame, text="⚡ START AUTO-TYPE ⚡",
+                                                    command=self.toggle_auto_type_loop,
+                                                    fg_color=self.COLOR_ACCENT, hover_color=self.COLOR_ACCENT_HOVER,
+                                                    height=70,
+                                                    font=self.FONT_TITLE,
+                                                    text_color=self.COLOR_BACKGROUND,
+                                                    corner_radius=12)
+        self.find_click_type_button.grid(row=9, column=0, sticky='ew', padx=15, pady=(20, 20))
+
+        # --- Configure "UTILITIES" Tab ---
+        utility_tab_container = self.tab_view.tab("UTILITIES")
+
+        utility_frame = ctk.CTkScrollableFrame(utility_tab_container, fg_color="transparent")
+        utility_frame.pack(fill="both", expand=True, padx=0, pady=0)
         utility_frame.columnconfigure(0, weight=1)
-        # Increased row count for the new Text Command section
-        utility_frame.rowconfigure(21, weight=1)
 
-        # -----------------------------------------------------
-        # Section 1: System Commands (Reboot/Shutdown)
-        # -----------------------------------------------------
-        ctk.CTkLabel(utility_frame, text="POWER CONTROL",
-                     font=ctk.CTkFont(size=16, weight="bold"), text_color=self.WARNING_COLOR).grid(row=0, column=0,
-                                                                                                   sticky='w', padx=15,
-                                                                                                   pady=(15, 5))
+        # --- Section: App Management (Stacked) ---
+        self._create_section_header(utility_frame, "APK MANAGEMENT", 0)
+        apk_frame = self._create_section_frame(utility_frame, 1)
 
-        system_cmd_frame = ctk.CTkFrame(utility_frame, fg_color=self.FRAME_COLOR)
-        system_cmd_frame.grid(row=1, column=0, sticky='ew', padx=15, pady=(5, 10))
-        system_cmd_frame.columnconfigure(0, weight=1)
-        system_cmd_frame.columnconfigure(1, weight=1)
+        self.apk_path_entry = ctk.CTkEntry(apk_frame, placeholder_text="Path: No APK selected...", height=45,
+                                           corner_radius=10, font=self.FONT_BODY)
+        self.apk_path_entry.grid(row=0, column=0, sticky='ew', padx=15, pady=(15, 5))
 
-        reboot_button = ctk.CTkButton(system_cmd_frame, text="REBOOT 🔄", command=self.reboot_devices,
-                                      fg_color=self.WARNING_COLOR, hover_color="#CC8400", corner_radius=8, height=40,
-                                      text_color=self.BACKGROUND_COLOR)
-        reboot_button.grid(row=0, column=0, sticky='ew', padx=(10, 5), pady=10)
-
-        shutdown_button = ctk.CTkButton(system_cmd_frame, text="POWER OFF ❌", command=self.shutdown_devices,
-                                        fg_color=self.DANGER_COLOR, hover_color="#CC4028", corner_radius=8, height=40,
-                                        text_color=self.ACCENT_COLOR)
-        shutdown_button.grid(row=0, column=1, sticky='ew', padx=(5, 10), pady=10)
-
-        # -----------------------------------------------------
-        # Section 2: Airplane Mode Control
-        # -----------------------------------------------------
-        ctk.CTkLabel(utility_frame, text="AIRPLANE MODE",
-                     font=ctk.CTkFont(size=16, weight="bold"), text_color=self.ACCENT_COLOR).grid(row=2, column=0,
-                                                                                                  sticky='w', padx=15,
-                                                                                                  pady=(10, 5))
-
-        airplane_mode_frame = ctk.CTkFrame(utility_frame, fg_color=self.FRAME_COLOR)
-        airplane_mode_frame.grid(row=3, column=0, sticky='ew', padx=15, pady=(5, 10))
-        airplane_mode_frame.columnconfigure(0, weight=1)
-        airplane_mode_frame.columnconfigure(1, weight=1)
-
-        enable_airplane_button = ctk.CTkButton(airplane_mode_frame, text="ENABLE AIRPLANE ✈️",
-                                               command=self.enable_airplane_mode,
-                                               fg_color="#3A3A3A", hover_color="#555555", corner_radius=8, height=40)
-        enable_airplane_button.grid(row=0, column=0, sticky='ew', padx=(10, 5), pady=10)
-
-        disable_airplane_button = ctk.CTkButton(airplane_mode_frame, text="DISABLE AIRPLANE 📶",
-                                                command=self.disable_airplane_mode,
-                                                fg_color=self.SUCCESS_COLOR, hover_color="#00A852", corner_radius=8,
-                                                height=40, text_color=self.BACKGROUND_COLOR)
-        disable_airplane_button.grid(row=0, column=1, sticky='ew', padx=(5, 10), pady=10)
-
-        # -----------------------------------------------------
-        # Section 3: Brightness Control (All Devices)
-        # -----------------------------------------------------
-        ctk.CTkLabel(utility_frame, text="BRIGHTNESS [0-255]",
-                     font=ctk.CTkFont(size=16, weight="bold"), text_color=self.ACCENT_COLOR).grid(row=4, column=0,
-                                                                                                  sticky='w', padx=15,
-                                                                                                  pady=(10, 5))
-
-        brightness_frame = ctk.CTkFrame(utility_frame, fg_color=self.FRAME_COLOR)
-        brightness_frame.grid(row=5, column=0, sticky='ew', padx=15, pady=(5, 10))
-        brightness_frame.columnconfigure(0, weight=1)
-        brightness_frame.columnconfigure(1, weight=1)
-        brightness_frame.columnconfigure(2, weight=1)
-
-        self.brightness_slider = ctk.CTkSlider(brightness_frame, from_=0, to=255, command=self.set_brightness,
-                                               number_of_steps=256, button_color=self.ACCENT_COLOR,
-                                               button_hover_color=self.ACCENT_HOVER, progress_color=self.ACCENT_COLOR)
-        self.brightness_slider.set(128)
-        self.brightness_slider.grid(row=0, column=0, columnspan=3, sticky='ew', padx=10, pady=(10, 5))
-
-        # Pre-set Brightness Buttons - Monochromatic gray/white
-        ctk.CTkButton(brightness_frame, text="LOW [20]", command=lambda: self.set_brightness(20),
-                      fg_color="#3A3A3A", hover_color="#555555", corner_radius=8, height=35).grid(row=1, column=0,
-                                                                                                  padx=(10, 5),
-                                                                                                  pady=(0, 10),
-                                                                                                  sticky='ew')
-        ctk.CTkButton(brightness_frame, text="MID [128]", command=lambda: self.set_brightness(128),
-                      fg_color="#3A3A3A", hover_color="#555555", corner_radius=8, height=35).grid(row=1, column=1,
-                                                                                                  padx=5, pady=(0, 10),
-                                                                                                  sticky='ew')
-        ctk.CTkButton(brightness_frame, text="MAX [255]", command=lambda: self.set_brightness(255),
-                      fg_color=self.ACCENT_COLOR, hover_color=self.ACCENT_HOVER, corner_radius=8, height=35,
-                      text_color=self.BACKGROUND_COLOR).grid(row=1, column=2, padx=(5, 10), pady=(0, 10), sticky='ew')
-
-        # -----------------------------------------------------
-        # Section 4: Volume Control (All Devices)
-        # -----------------------------------------------------
-        ctk.CTkLabel(utility_frame, text="VOLUME CONTROL",
-                     font=ctk.CTkFont(size=16, weight="bold"), text_color=self.ACCENT_COLOR).grid(row=6, column=0,
-                                                                                                  sticky='w', padx=15,
-                                                                                                  pady=(10, 5))
-
-        volume_frame = ctk.CTkFrame(utility_frame, fg_color=self.FRAME_COLOR)
-        volume_frame.grid(row=7, column=0, sticky='ew', padx=15, pady=(5, 10))
-        volume_frame.columnconfigure(0, weight=1)
-        volume_frame.columnconfigure(1, weight=1)
-        volume_frame.columnconfigure(2, weight=1)
-
-        ctk.CTkButton(volume_frame, text="VOL UP 🔊", command=lambda: self.send_adb_keyevent(24),
-                      fg_color=self.SUCCESS_COLOR, hover_color="#00A852", corner_radius=8, height=40,
-                      text_color=self.BACKGROUND_COLOR).grid(row=0, column=0, padx=(10, 5), pady=10, sticky='ew')
-
-        ctk.CTkButton(volume_frame, text="VOL DOWN 🔉", command=lambda: self.send_adb_keyevent(25),
-                      fg_color="#3A3A3A", hover_color="#555555", corner_radius=8, height=40).grid(row=0, column=1,
-                                                                                                  padx=5, pady=10,
-                                                                                                  sticky='ew')
-
-        self.mute_button = ctk.CTkButton(volume_frame, text="MUTE 🔇", command=self.toggle_mute,
-                                         fg_color="#3A3A3A", hover_color="#555555", corner_radius=8, height=40)
-        self.mute_button.grid(row=0, column=2, padx=(5, 10), pady=10, sticky='ew')
-
-        # -----------------------------------------------------
-        # Section 5: APK Installation
-        # -----------------------------------------------------
-        ctk.CTkLabel(utility_frame, text="APK INSTALLATION",
-                     font=ctk.CTkFont(size=16, weight="bold"), text_color=self.ACCENT_COLOR).grid(row=8, column=0,
-                                                                                                  sticky='w', padx=15,
-                                                                                                  pady=(10, 5))
-
-        self.apk_path_entry = ctk.CTkEntry(utility_frame, placeholder_text="Path: No APK selected...", height=35,
-                                           corner_radius=8)
-        self.apk_path_entry.grid(row=9, column=0, sticky='ew', padx=15)
-
-        apk_button_frame = ctk.CTkFrame(utility_frame, fg_color="transparent")
-        apk_button_frame.grid(row=10, column=0, sticky='ew', padx=15, pady=(5, 15))
+        apk_button_frame = ctk.CTkFrame(apk_frame, fg_color="transparent")
+        apk_button_frame.grid(row=1, column=0, sticky='ew', padx=15, pady=(5, 15))
         apk_button_frame.columnconfigure(0, weight=1)
         apk_button_frame.columnconfigure(1, weight=1)
 
         browse_apk_button = ctk.CTkButton(apk_button_frame, text="BROWSE", command=self.browse_apk_file,
-                                          fg_color="#3A3A3A", hover_color="#555555", corner_radius=8, height=40)
-        browse_apk_button.grid(row=0, column=0, sticky='ew', padx=(0, 5))
+                                          fg_color=self.COLOR_BORDER, hover_color=self.COLOR_TEXT_SECONDARY,
+                                          corner_radius=10, height=50,
+                                          font=self.FONT_BUTTON)
+        browse_apk_button.grid(row=0, column=0, sticky='ew', padx=(0, 7))
 
         install_apk_button = ctk.CTkButton(apk_button_frame, text="INSTALL APK ⬇️", command=self.install_apk_to_devices,
-                                           fg_color=self.SUCCESS_COLOR, hover_color="#00A852", corner_radius=8,
-                                           height=40,
-                                           font=ctk.CTkFont(weight="bold"), text_color=self.BACKGROUND_COLOR)
-        install_apk_button.grid(row=0, column=1, sticky='ew', padx=(5, 0))
+                                           fg_color=self.COLOR_ACCENT, hover_color=self.COLOR_ACCENT_HOVER,
+                                           corner_radius=10,
+                                           height=50,
+                                           font=self.FONT_BUTTON, text_color=self.COLOR_BACKGROUND)
+        install_apk_button.grid(row=0, column=1, sticky='ew', padx=(7, 0))
 
-        # -----------------------------------------------------
-        # Section 6: Custom Shell Command
-        # -----------------------------------------------------
-        ctk.CTkLabel(utility_frame, text="CUSTOM SHELL COMMAND",
-                     font=ctk.CTkFont(size=16, weight="bold"), text_color=self.ACCENT_COLOR).grid(row=11, column=0,
-                                                                                                  sticky='w', padx=15,
-                                                                                                  pady=(10, 5))
+        # --- Section: Device Control ---
+        self._create_section_header(utility_frame, "NETWORK/DEVICE CONTROL", 2)
+        device_control_frame = self._create_section_frame(utility_frame, 3)
+        device_control_frame.columnconfigure(0, weight=1)
+        device_control_frame.columnconfigure(1, weight=1)
 
-        self.custom_cmd_entry = ctk.CTkEntry(utility_frame,
-                                             placeholder_text="Input arguments (e.g., input keyevent 3)...", height=35,
-                                             corner_radius=8)
-        self.custom_cmd_entry.grid(row=12, column=0, sticky='ew', padx=15)
+        enable_airplane_button = ctk.CTkButton(device_control_frame, text="ENABLE AIRPLANE ✈️",
+                                               command=self.enable_airplane_mode,
+                                               fg_color=self.COLOR_BORDER, hover_color=self.COLOR_TEXT_SECONDARY,
+                                               corner_radius=10, height=50,
+                                               font=self.FONT_BUTTON)
+        enable_airplane_button.grid(row=0, column=0, sticky='ew', padx=(15, 7), pady=15)
 
-        run_custom_button = ctk.CTkButton(utility_frame, text="RUN COMMAND >",
-                                          command=self.run_custom_shell_command,
-                                          fg_color="#3A3A3A", hover_color="#555555", height=45,
-                                          font=ctk.CTkFont(size=14, weight="bold"), text_color=self.ACCENT_COLOR,
-                                          border_color=self.ACCENT_COLOR, border_width=1)
-        run_custom_button.grid(row=13, column=0, sticky='ew', padx=15, pady=(10, 15))
+        disable_airplane_button = ctk.CTkButton(device_control_frame, text="DISABLE AIRPLANE 📶",
+                                                command=self.disable_airplane_mode,
+                                                fg_color=self.COLOR_SUCCESS, hover_color=self.COLOR_SUCCESS_HOVER,
+                                                corner_radius=10,
+                                                height=50, text_color=self.COLOR_BACKGROUND,
+                                                font=self.FONT_BUTTON)
+        disable_airplane_button.grid(row=0, column=1, sticky='ew', padx=(7, 15), pady=15)
 
-        # --- Separator before Text Commands ---
-        ctk.CTkFrame(utility_frame, height=1, fg_color=self.ACCENT_COLOR).grid(row=14, column=0,
-                                                                               sticky='ew',
-                                                                               padx=15, pady=15)
+        # --- Section: Image Sharing ---
+        self._create_section_header(utility_frame, "SHARE IMAGE TO TIKTOK LITE", 4)
+        image_frame = self._create_section_frame(utility_frame, 5)
 
-        # -----------------------------------------------------
-        # Section 7: Text Command Section (MOVED from FB Lite Tab)
-        # -----------------------------------------------------
-        ctk.CTkLabel(utility_frame, text="TEXT COMMAND FROM FILE", font=ctk.CTkFont(size=16, weight="bold"),
-                     text_color=self.SUCCESS_COLOR).grid(row=15,
-                                                         column=0,
-                                                         sticky='w',
-                                                         pady=(
-                                                             0, 5),
-                                                         padx=15)
-        self.file_path_entry = ctk.CTkEntry(utility_frame, placeholder_text="Path: Select a text file (.txt)...",
-                                            height=40,
-                                            corner_radius=8)
-        self.file_path_entry.grid(row=16, column=0, sticky='ew', padx=15)
-        browse_button = ctk.CTkButton(utility_frame, text="BROWSE TXT", command=self.browse_file, corner_radius=8,
-                                      fg_color="#3A3A3A", hover_color="#555555")
-        browse_button.grid(row=17, column=0, sticky='ew', padx=15, pady=(10, 10))
+        self.image_file_name_entry = ctk.CTkEntry(image_frame,
+                                                  placeholder_text="Enter image name in /sdcard/Download...",
+                                                  height=45,
+                                                  corner_radius=10, font=self.FONT_BODY)
+        self.image_file_name_entry.grid(row=0, column=0, sticky='ew', padx=15, pady=(15, 10))
 
-        # --- Text Command Buttons Frame ---
-        text_buttons_frame = ctk.CTkFrame(utility_frame, fg_color="transparent")
-        text_buttons_frame.grid(row=18, column=0, sticky='ew', padx=15, pady=0)
-        text_buttons_frame.columnconfigure(0, weight=1)
-        text_buttons_frame.columnconfigure(1, weight=1)
+        self.share_image_button = ctk.CTkButton(image_frame, text="SHARE IMAGE",
+                                                command=self.share_image_to_tiktok_lite,
+                                                fg_color=self.COLOR_ACCENT, hover_color=self.COLOR_ACCENT_HOVER,
+                                                height=50,
+                                                font=self.FONT_BUTTON, corner_radius=10,
+                                                text_color=self.COLOR_BACKGROUND)
+        self.share_image_button.grid(row=1, column=0, sticky='ew', padx=15, pady=(10, 15))
 
-        self.send_button = ctk.CTkButton(text_buttons_frame, text="SEND RANDOM TEXT ✉️",
-                                         command=self.send_text_to_devices,
-                                         fg_color=self.SUCCESS_COLOR, hover_color="#00A852", height=45,
-                                         font=ctk.CTkFont(weight="bold"), text_color=self.BACKGROUND_COLOR)
-        self.send_button.grid(row=0, column=0, sticky='ew', padx=(0, 5), pady=(5, 5))
-
-        self.remove_emoji_button = ctk.CTkButton(text_buttons_frame, text="REMOVE EMOJIS 🚫",
-                                                 command=self.remove_emojis_from_file,
-                                                 fg_color=self.WARNING_COLOR, hover_color="#CC8400", height=45,
-                                                 font=ctk.CTkFont(weight="bold"), text_color=self.BACKGROUND_COLOR)
-        self.remove_emoji_button.grid(row=0, column=1, sticky='ew', padx=(5, 0), pady=(5, 5))
-
-        # --- MODIFIED "Find, Click & Type" Button to "START AUTO-TYPE" ---
-        self.find_click_type_button = ctk.CTkButton(utility_frame, text="START AUTO-TYPE ⌨️",
-                                                    command=self.toggle_auto_type_loop,
-                                                    fg_color="#3A3A3A", hover_color="#555555", height=45,
-                                                    font=ctk.CTkFont(size=14, weight="bold"),
-                                                    text_color=self.ACCENT_COLOR,
-                                                    border_color=self.ACCENT_COLOR, border_width=1)
-        self.find_click_type_button.grid(row=19, column=0, sticky='ew', padx=15, pady=(10, 15))
-
-        # TikTok Tab
-        tiktok_frame = self.tab_view.tab("TikTok")
-        tiktok_frame.columnconfigure(0, weight=1)
-        tiktok_frame.rowconfigure(4, weight=1)
-
-        ctk.CTkLabel(tiktok_frame, text="TIKTOK URL", font=ctk.CTkFont(size=14, weight="bold")).grid(row=0, column=0,
-                                                                                                     sticky='w',
-                                                                                                     pady=(15, 5),
-                                                                                                     padx=15)
-        self.tiktok_url_entry = ctk.CTkEntry(tiktok_frame, placeholder_text="Enter TikTok URL...", height=40,
-                                             corner_radius=8)
-        self.tiktok_url_entry.grid(row=1, column=0, sticky='ew', padx=15)
-        self.tiktok_button = ctk.CTkButton(tiktok_frame, text="VISIT POST", command=self.open_tiktok_lite_deeplink,
-                                           fg_color="#fe2c55", hover_color="#c82333", height=45,
-                                           font=ctk.CTkFont(weight="bold"))
-        self.tiktok_button.grid(row=2, column=0, pady=10, sticky='ew', padx=15)
-
-        tiktok_launch_frame = ctk.CTkFrame(tiktok_frame, fg_color="transparent")
-        tiktok_launch_frame.grid(row=3, column=0, sticky='ew', padx=15, pady=(20, 15))
-        tiktok_launch_frame.columnconfigure(0, weight=1)
-        tiktok_launch_frame.columnconfigure(1, weight=1)
-        self.launch_tiktok_lite_button = ctk.CTkButton(tiktok_launch_frame, text="Launch TikTok Lite",
-                                                       command=self.launch_tiktok_lite, corner_radius=8,
-                                                       fg_color="#3A3A3A", hover_color="#555555")
-        self.launch_tiktok_lite_button.grid(row=0, column=0, sticky='ew', padx=(0, 5))
-        self.force_stop_tiktok_lite_button = ctk.CTkButton(tiktok_launch_frame, text="Force Stop",
-                                                           command=self.force_stop_tiktok_lite,
-                                                           fg_color=self.DANGER_COLOR,
-                                                           hover_color="#CC4028", corner_radius=8,
-                                                           text_color=self.ACCENT_COLOR)
-        self.force_stop_tiktok_lite_button.grid(row=0, column=1, sticky='ew', padx=(5, 0))
-
-    # --- Remaining Essential Methods ---
+    # --- ADB Utility Methods (Unchanged Logic) ---
 
     def _threaded_airplane_mode(self, mode):
-        """Helper function to run airplane mode commands in a thread."""
         if not self.devices:
-            self.after(0, lambda: self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107"))
+            self.after(0, lambda: self.status_label.configure(text="⚠️ No devices detected.",
+                                                              text_color=self.COLOR_WARNING))
             return
 
         state = '1' if mode == 'enable' else '0'
         name = 'ENABLE' if mode == 'enable' else 'DISABLE'
 
         self.after(0, lambda: self.status_label.configure(
-            text=f"[CMD] Sending {name} AIRPLANE MODE command...", text_color=self.ACCENT_COLOR))
+            text=f"[CMD] Sending {name} AIRPLANE MODE command...", text_color=self.COLOR_ACCENT))
 
-        # 1. Set the system setting
         set_cmd = ['shell', 'settings', 'put', 'global', 'airplane_mode_on', state]
-
-        # 2. Broadcast the change (crucial for it to take effect instantly)
         broadcast_cmd = ['shell', 'am', 'broadcast', '-a', 'android.intent.action.AIRPLANE_MODE']
 
-        # Submit both commands for each device
         for serial in self.devices:
-            # We don't wait for success/failure here as setting changes don't return meaningful output
             self.executor.submit(run_adb_command, set_cmd, serial)
             self.executor.submit(run_adb_command, broadcast_cmd, serial)
 
         self.after(0, lambda: self.status_label.configure(
-            text=f"✅ AIRPLANE MODE {name} command sent to all devices.", text_color=self.SUCCESS_COLOR))
+            text=f"✅ AIRPLANE MODE {name} command sent to all devices.", text_color=self.COLOR_SUCCESS))
 
     def enable_airplane_mode(self):
-        """Enables Airplane Mode on all connected devices."""
         threading.Thread(target=self._threaded_airplane_mode, args=('enable',), daemon=True).start()
 
     def disable_airplane_mode(self):
-        """Disables Airplane Mode on all connected devices."""
         threading.Thread(target=self._threaded_airplane_mode, args=('disable',), daemon=True).start()
 
-    def set_brightness(self, value):
-        """Sets the screen brightness via ADB settings put command (0-255)."""
-        if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
-            return
-
-        # Ensure value is an integer and within the valid range
-        brightness_level = int(float(value))
-        if not 0 <= brightness_level <= 255:
-            brightness_level = max(0, min(255, brightness_level))
-
-        # Update slider position (useful when clicking preset buttons)
-        self.brightness_slider.set(brightness_level)
-
-        self.status_label.configure(text=f"[CMD] Setting Brightness: {brightness_level} on all devices...",
-                                    text_color=self.ACCENT_COLOR)
-
-        # Set screen brightness (0-255)
-        brightness_cmd = ['shell', 'settings', 'put', 'system', 'screen_brightness', str(brightness_level)]
-
-        # Set screen brightness mode to manual (0) to allow settings to take effect
-        mode_cmd = ['shell', 'settings', 'put', 'system', 'screen_brightness_mode', '0']
-
-        for serial in self.devices:
-            # Need to run both mode and brightness commands
-            self.executor.submit(run_adb_command, mode_cmd, serial)
-            self.executor.submit(run_adb_command, brightness_cmd, serial)
-
-        self.status_label.configure(text=f"✅ BRIGHTNESS SET to {brightness_level}.",
-                                    text_color=self.SUCCESS_COLOR)
-
-    def toggle_mute(self):
-        """Toggles the volume mute state."""
-        if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
-            return
-
-        keycode = '23'  # KEYCODE_MUTE (or KEYCODE_VOLUME_MUTE)
-
-        if self.is_muted:
-            # If currently muted, un-mute (send key event)
-            self.mute_button.configure(text="MUTE 🔇", fg_color="#3A3A3A", hover_color="#555555")
-            self.status_label.configure(text="[CMD] Unmuting volume...", text_color=self.ACCENT_COLOR)
-            self.is_muted = False
-        else:
-            # If currently unmuted, mute (send key event)
-            self.mute_button.configure(text="UNMUTE 🔊", fg_color=self.DANGER_COLOR, hover_color="#CC4028",
-                                       text_color=self.ACCENT_COLOR)
-            self.status_label.configure(text="[CMD] Muting volume...", text_color=self.ACCENT_COLOR)
-            self.is_muted = True
-
-        command = ['shell', 'input', 'keyevent', keycode]
-        for serial in self.devices:
-            self.executor.submit(run_adb_command, command, serial)
-
-        self.status_label.configure(text=f"✅ Volume toggle submitted.", text_color=self.SUCCESS_COLOR)
-
-    def reboot_devices(self):
-        """Reboots all connected devices."""
-        if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
-            return
-
-        if not messagebox.askyesno("Confirm Action", "Are you sure you want to REBOOT all connected devices?"):
-            return
-
-        self.status_label.configure(text="[CMD] Rebooting all connected devices...", text_color=self.WARNING_COLOR)
-        command = ['reboot']
-        for device_serial in self.devices:
-            self.executor.submit(run_adb_command, command, device_serial)
-
-        # Redetect devices after a short delay, as rebooting devices disappear and reappear
-        self.after(2000, self.detect_devices)
-
-    def shutdown_devices(self):
-        """Sends a power off command to all connected devices."""
-        if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
-            return
-
-        if not messagebox.askyesno("Confirm Action", "Are you sure you want to POWER OFF all connected devices?"):
-            return
-
-        self.status_label.configure(text="[CMD] Shutting down all connected devices...", text_color=self.DANGER_COLOR)
-        command = ['shell', 'reboot', '-p']  # ADB command for poweroff
-        for device_serial in self.devices:
-            self.executor.submit(run_adb_command, command, device_serial)
-
-        # Redetect devices to clear the list
-        self.after(2000, self.detect_devices)
-
     def browse_apk_file(self):
-        """Opens a file dialog to select an APK file."""
         file_path = filedialog.askopenfilename(
             defaultextension=".apk",
             filetypes=[("APK files", "*.apk")]
@@ -687,22 +627,21 @@ class AdbControllerApp(ctk.CTk):
             self.apk_path_entry.delete(0, tk.END)
             self.apk_path_entry.insert(0, os.path.basename(file_path))
             self.status_label.configure(text=f"✅ APK SELECTED: {os.path.basename(file_path)}",
-                                        text_color=self.SUCCESS_COLOR)
+                                        text_color=self.COLOR_SUCCESS)
 
     def install_apk_to_devices(self):
-        """Installs the selected APK on all connected devices."""
         if not self.apk_path or not os.path.exists(self.apk_path):
-            self.status_label.configure(text="⚠️ Please select a valid APK file first.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ Please select a valid APK file first.", text_color=self.COLOR_WARNING)
             return
 
         if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ No devices detected.", text_color=self.COLOR_WARNING)
             return
 
         self.status_label.configure(text=f"[CMD] Installing {os.path.basename(self.apk_path)} on all devices...",
-                                    text_color=self.ACCENT_COLOR)
+                                    text_color=self.COLOR_ACCENT)
 
-        command = ['install', '-r', self.apk_path]  # -r flag means reinstall if it already exists
+        command = ['install', '-r', self.apk_path]
 
         results = []
 
@@ -710,139 +649,33 @@ class AdbControllerApp(ctk.CTk):
             success, output = run_adb_command(command, serial)
             results.append((serial, success, output))
 
-        # Submit tasks and wait for all to complete
         futures = [self.executor.submit(_install_task, serial) for serial in self.devices]
         concurrent.futures.wait(futures)
 
-        # Check results and update status
         all_success = all(success for _, success, _ in results)
         if all_success:
-            self.status_label.configure(text="✅ APK INSTALL SUCCESSFUL.", text_color=self.SUCCESS_COLOR)
+            self.status_label.configure(text="✅ APK INSTALL SUCCESSFUL.", text_color=self.COLOR_SUCCESS)
         else:
             error_count = sum(1 for _, success, _ in results if not success)
             self.status_label.configure(text=f"❌ INSTALLATION FAILED on {error_count} device(s).",
-                                        text_color=self.DANGER_COLOR)
-
-    def run_custom_shell_command(self):
-        """Runs a user-defined ADB shell command on all connected devices."""
-        custom_cmd_str = self.custom_cmd_entry.get().strip()
-        if not custom_cmd_str:
-            self.status_label.configure(text="⚠️ Please enter a shell command to run.", text_color="#ffc107")
-            return
-
-        if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
-            return
-
-        # Prepare the command: split the string into a list of arguments
-        try:
-            custom_args = custom_cmd_str.split()
-            command = ['shell'] + custom_args
-
-        except Exception:
-            self.status_label.configure(text="❌ Invalid command format.", text_color=self.DANGER_COLOR)
-            return
-
-        self.status_label.configure(text=f"[CMD] Running custom command: '{custom_cmd_str}'",
-                                    text_color=self.ACCENT_COLOR)
-
-        for device_serial in self.devices:
-            self.executor.submit(run_adb_command, command, device_serial)
-
-        self.status_label.configure(text=f"✅ Custom command submitted to all devices.", text_color=self.SUCCESS_COLOR)
-
-    def check_for_updates(self):
-        """
-        Modified existing check_for_updates to only run once on startup
-        and handle errors/messages explicitly.
-        """
-
-        def _check_in_thread():
-            import requests  # Re-added import for update logic
-            try:
-                # Use a slightly longer timeout for version check
-                response = requests.get(VERSION_CHECK_URL, timeout=10)
-                response.raise_for_status()  # Raise HTTPError for bad status codes (4xx or 5xx)
-
-                latest_version = response.text.strip()
-                if latest_version > __version__:
-                    self.after(0, self.ask_for_update, latest_version)
-
-            except requests.exceptions.HTTPError as http_err:
-                status_code = http_err.response.status_code
-                self.after(0, lambda: self.status_label.configure(
-                    text=f"❌ ERROR: Failed to check for update. HTTP Status: {status_code}",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showwarning(
-                    "Update Check Failed",
-                    f"Unable to reach the update server (HTTP Error {status_code}). Check your network or firewall settings."))
-            except requests.exceptions.ConnectionError:
-                self.after(0, lambda: self.status_label.configure(
-                    text="❌ ERROR: Failed to check for update. Connection Refused.",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showwarning(
-                    "Update Check Failed",
-                    "Cannot connect to the update server. Check your internet connection, firewall, or proxy."))
-            except requests.exceptions.Timeout:
-                self.after(0, lambda: self.status_label.configure(
-                    text="❌ ERROR: Failed to check for update. Connection Timed Out.",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showwarning(
-                    "Update Check Failed",
-                    "The connection timed out while checking for updates. Your network might be slow or unstable."))
-            except requests.exceptions.RequestException as e:
-                self.after(0, lambda: self.status_label.configure(
-                    text=f"❌ ERROR: Failed to check for update. Details: {e.__class__.__name__}",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showwarning(
-                    "Update Check Failed",
-                    f"An error occurred during update check: {e.__class__.__name__}. Check logs for details."))
-            except Exception:
-                # Catch all other unexpected errors
-                self.after(0, lambda: self.status_label.configure(
-                    text="❌ ERROR: An unexpected error occurred during version check.",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showwarning(
-                    "Update Check Failed",
-                    "An unexpected error occurred during the version check."))
-
-        update_thread = threading.Thread(target=_check_in_thread, daemon=True)
-        update_thread.start()
-
-    def ask_for_update(self, latest_version):
-        title = "New ADB Commander Update!"
-        message = (
-            f"An improved version ({latest_version}) is now available!\n\n"
-            "New Auto Click what's on your mind Auto Type caption This update contains the latest upgrades and performance improvements for faster and more reliable control of your devices.\n\n"
-            "The app will close and restart to complete the update. Would you like to update now?"
-        )
-
-        response = messagebox.askyesno(title, message)
-        if response:
-            self.update_app()
+                                        text_color=self.COLOR_DANGER)
 
     def update_app(self):
-        # Adjusted error handling in _update_in_thread for clarity
         def _update_in_thread():
-            import requests  # Re-added import for update logic
             try:
-                self.status_label.configure(text="[SYS] Downloading latest version...", text_color=self.ACCENT_COLOR)
-
+                self.status_label.configure(text="[SYS] Downloading latest version...", text_color=self.COLOR_ACCENT)
                 response = requests.get(UPDATE_URL)
-                response.raise_for_status()  # Raise HTTPError for bad status codes (4xx or 5xx)
+                response.raise_for_status()
 
                 desktop_path = Path.home() / "Desktop"
-                # Handle both frozen executable and script mode
                 old_file_path = Path(sys.executable) if getattr(sys, 'frozen', False) else Path(sys.argv[0])
 
-                # Check if the app is run from a location we can write to and execute later
                 if not old_file_path.is_file():
-                    # If running from a temp location (like a frozen app not on desktop), default to desktop
                     new_file_path = desktop_path / "adb_tool_by_dars.py"
                 elif old_file_path.suffix == '.py':
                     new_file_path = old_file_path.parent / old_file_path.name
-                else:  # frozen executable
-                    new_file_path = desktop_path / old_file_path.name  # Replace the exe on the desktop
+                else:
+                    new_file_path = desktop_path / old_file_path.name
 
                 with open(new_file_path, 'wb') as f:
                     f.write(response.content)
@@ -854,323 +687,555 @@ class AdbControllerApp(ctk.CTk):
 
                 self.destroy()
 
-            except requests.exceptions.HTTPError as http_err:
-                status_code = http_err.response.status_code
+            except requests.exceptions.HTTPError:
                 self.after(0, lambda: self.status_label.configure(
-                    text=f"❌ ERROR: Update download failed. HTTP Status: {status_code}",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showerror(
-                    "Update Download Failed",
-                    f"Failed to download update (HTTP Error {status_code}). Check if the update file exists at the URL."))
-            except requests.exceptions.ConnectionError:
+                    text=f"❌ ERROR: Update download failed. HTTP Error.",
+                    text_color=self.COLOR_DANGER))
+            except requests.exceptions.RequestException:
                 self.after(0, lambda: self.status_label.configure(
-                    text="❌ ERROR: Update download failed. Connection Refused.",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showerror(
-                    "Update Download Failed",
-                    "Failed to download update. Cannot connect to the server. Check your internet connection or firewall."))
-            except requests.exceptions.Timeout:
-                self.after(0, lambda: self.status_label.configure(
-                    text="❌ ERROR: Update download timed out.",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showerror(
-                    "Update Download Failed",
-                    "Update download timed out. Your network might be slow or unstable."))
-            except requests.exceptions.RequestException as e:
-                self.after(0, lambda: self.status_label.configure(
-                    text=f"❌ ERROR: Update download failed. Details: {e.__class__.__name__}",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showerror(
-                    "Update Download Failed",
-                    f"An error occurred during download: {e.__class__.__name__}. Check logs for details."))
+                    text="❌ ERROR: Update download failed. Connection Error.",
+                    text_color=self.COLOR_DANGER))
             except Exception as e:
                 self.after(0, lambda: self.status_label.configure(
                     text=f"❌ ERROR: An unexpected update error occurred: {e}",
-                    text_color=self.DANGER_COLOR))
-                self.after(0, lambda: messagebox.showerror(
-                    "Update Error",
-                    f"An unexpected file operation error occurred.\nError: {e}"))
+                    text_color=self.COLOR_DANGER))
 
         update_thread = threading.Thread(target=_update_in_thread, daemon=True)
         update_thread.start()
 
-    def browse_file(self):
+    # --- Dynamic Link/Caption Pair Management (Unchanged Logic) ---
+
+    def add_share_pair(self, is_initial=False):
+        # Use a secondary color for the inner frame to create depth
+        frame = ctk.CTkFrame(self.share_pair_frame, fg_color=self.COLOR_FRAME, corner_radius=8, border_width=1,
+                             border_color=self.COLOR_ACCENT_HOVER)
+        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(1, weight=0)
+
+        # Style the entry field
+        share_url_entry = ctk.CTkEntry(frame,
+                                       placeholder_text=f"Link #{len(self.share_pairs) + 1}: Enter link to share...",
+                                       height=40, corner_radius=8, font=self.FONT_BODY,
+                                       fg_color=self.COLOR_BACKGROUND, border_color=self.COLOR_BORDER, border_width=1)
+        share_url_entry.grid(row=0, column=0, sticky='ew', padx=10, pady=(10, 5))
+
+        if not is_initial:
+            remove_button = ctk.CTkButton(frame, text="✖️", width=40, height=40, corner_radius=8,
+                                          fg_color=self.COLOR_DANGER, hover_color=self.COLOR_DANGER_HOVER,
+                                          command=lambda: self.remove_share_pair(frame), font=self.FONT_BUTTON)
+            remove_button.grid(row=0, column=1, sticky='e', padx=(0, 10), pady=(10, 5))
+
+        caption_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        caption_frame.grid(row=1, column=0, columnspan=2, sticky='ew', padx=10, pady=(0, 10))
+        caption_frame.columnconfigure(0, weight=1)
+        caption_frame.columnconfigure(1, weight=0)
+
+        file_path_entry = ctk.CTkEntry(caption_frame, placeholder_text="Comment File Path: Select a text file...",
+                                       height=40, corner_radius=8, font=self.FONT_BODY,
+                                       fg_color=self.COLOR_BACKGROUND, border_color=self.COLOR_BORDER, border_width=1)
+        file_path_entry.grid(row=0, column=0, sticky='ew', padx=(0, 7))
+
+        browse_button = ctk.CTkButton(caption_frame, text="BROWSE TXT", corner_radius=8, width=120, height=40,
+                                      fg_color=self.COLOR_SUCCESS, hover_color=self.COLOR_SUCCESS_HOVER,
+                                      font=self.FONT_BUTTON, text_color=self.COLOR_BACKGROUND,
+                                      command=lambda: self.browse_share_pair_file(file_path_entry))
+        browse_button.grid(row=0, column=1, sticky='e')
+
+        self.share_pairs.append({
+            'frame': frame,
+            'url_entry': share_url_entry,
+            'file_entry': file_path_entry
+        })
+        frame.pack(fill='x', padx=5, pady=10)
+        self.share_pair_frame.update_idletasks()
+
+    def remove_share_pair(self, pair_frame_to_remove):
+        for i, pair in enumerate(self.share_pairs):
+            if pair['frame'] == pair_frame_to_remove:
+                pair['frame'].destroy()
+                self.share_pairs.pop(i)
+                self.status_label.configure(text=f"✅ Link/Comment Pair removed.", text_color=self.COLOR_SUCCESS)
+                if self.is_auto_typing.is_set():
+                    self.stop_auto_type_loop()
+                    self.after(100, self.start_auto_type_loop)
+                return
+
+    def browse_share_pair_file(self, target_entry):
         file_path = filedialog.askopenfilename(
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
         )
         if file_path:
-            self.file_path_entry.delete(0, tk.END)
-            self.file_path_entry.insert(0, file_path)
+            target_entry.delete(0, tk.END)
+            target_entry.insert(0, file_path)
             self.status_label.configure(text=f"✅ FILE SELECTED: {os.path.basename(file_path)}",
-                                        text_color=self.SUCCESS_COLOR)
-
-            # --- MODIFICATION ---
-            # Automatically stop any running loop if a new file is selected
+                                        text_color=self.COLOR_SUCCESS)
             if self.is_auto_typing.is_set():
-                self.toggle_auto_type_loop()
+                self.stop_auto_type_loop()
+                self.after(100, self.start_auto_type_loop)
 
     def _threaded_send_text(self):
-        file_path = self.file_path_entry.get()
-        if not file_path:
-            self.status_label.configure(text="⚠️ Please select a text file.", text_color="#ffc107")
+        file_paths = []
+        for pair in self.share_pairs:
+            file_path = pair['file_entry'].get()
+            if file_path and os.path.exists(file_path):
+                file_paths.append(file_path)
+
+        if not file_paths:
+            self.status_label.configure(text="⚠️ Please select a text file for at least one pair.",
+                                        text_color=self.COLOR_WARNING)
             return
 
         if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ No devices detected.", text_color=self.COLOR_WARNING)
             return
 
+        random_file_path = random.choice(file_paths)
+
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(random_file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
             clean_lines = [line.strip() for line in lines if line.strip()]
 
             if not clean_lines:
-                self.status_label.configure(text="⚠️ The selected file is empty or has no content.",
-                                            text_color="#ffc107")
+                self.status_label.configure(
+                    text=f"⚠️ The selected file '{os.path.basename(random_file_path)}' is empty.",
+                    text_color=self.COLOR_WARNING)
                 return
 
             self.status_label.configure(
-                text=f"[CMD] Sending random text from file '{os.path.basename(file_path)}' to all devices...",
-                text_color=self.ACCENT_COLOR)
+                text=f"[CMD] Sending random text from file '{os.path.basename(random_file_path)}' to all devices...",
+                text_color=self.COLOR_ACCENT)
 
             for device_serial in self.devices:
                 random_text = random.choice(clean_lines)
                 self.executor.submit(run_text_command, random_text, device_serial)
 
-            self.status_label.configure(text=f"✅ Text commands submitted.", text_color=self.SUCCESS_COLOR)
+            self.status_label.configure(text=f"✅ Text commands submitted.", text_color=self.COLOR_SUCCESS)
 
 
         except FileNotFoundError:
-            self.status_label.configure(text="❌ ERROR: File not found.", text_color=self.DANGER_COLOR)
+            self.status_label.configure(text="❌ ERROR: File not found.", text_color=self.COLOR_DANGER)
         except Exception as e:
-            self.status_label.configure(text=f"❌ ERROR: An error occurred: {e}", text_color=self.DANGER_COLOR)
+            self.status_label.configure(text=f"❌ ERROR: An error occurred: {e}", text_color=self.COLOR_DANGER)
 
     def send_text_to_devices(self):
         send_thread = threading.Thread(target=self._threaded_send_text, daemon=True)
         send_thread.start()
 
-    # --- NEW METHOD: Toggles the auto-type loop ---
-    def toggle_auto_type_loop(self):
-        """
-        Toggles the 'while true' loop for finding, clicking, and typing.
-        """
+    # --- Auto-Type Logic (Updated for Deep Link Fix) ---
+
+    def start_auto_type_loop(self):
         if self.is_auto_typing.is_set():
-            # --- STOP THE LOOP ---
-            self.is_auto_typing.clear()
-            self.find_click_type_button.configure(text="START AUTO-TYPE ⌨️",
-                                                  fg_color="#3A3A3A",
-                                                  hover_color="#555555")
-            self.status_label.configure(text="[CMD] Stopping auto-type loop...", text_color=self.WARNING_COLOR)
             return
 
-        # --- START THE LOOP ---
-        file_path = self.file_path_entry.get()
-        if not file_path:
-            self.status_label.configure(text="⚠️ Please select a text file first.", text_color="#ffc107")
+        valid_pairs = []
+        for pair in self.share_pairs:
+            share_url = pair['url_entry'].get()
+            file_path = pair['file_entry'].get()
+
+            if share_url:
+                valid_pairs.append({'url': share_url, 'file': file_path})
+
+        if not valid_pairs:
+            self.status_label.configure(text="⚠️ No valid Links found. Please enter at least one URL.",
+                                        text_color=self.COLOR_WARNING)
             return
 
         if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ No devices detected.", text_color=self.COLOR_WARNING)
             return
 
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            clean_lines = [line.strip() for line in lines if line.strip()]
-            if not clean_lines:
-                self.status_label.configure(text="⚠️ Text file is empty.", text_color="#ffc107")
-                return
-        except FileNotFoundError:
-            self.status_label.configure(text="❌ ERROR: Text file not found.", text_color=self.DANGER_COLOR)
-            return
-        except Exception as e:
-            self.status_label.configure(text=f"❌ ERROR: Reading file: {e}", text_color=self.DANGER_COLOR)
-            return
-
-        # Set the flag
         self.is_auto_typing.set()
 
-        # Update button to be a STOP button
-        self.find_click_type_button.configure(text="STOP AUTO-TYPE 🛑",
-                                              fg_color=self.DANGER_COLOR,
-                                              hover_color="#CC4028")
+        self.find_click_type_button.configure(text="🛑 STOP AUTO-TYPE 🛑",
+                                              fg_color=self.COLOR_DANGER,
+                                              hover_color=self.COLOR_DANGER_HOVER,
+                                              text_color=self.COLOR_TEXT_PRIMARY)
 
-        self.status_label.configure(text="[CMD] Auto-type loop STARTED.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text="[CMD] Auto-type loop STARTED.", text_color=self.COLOR_SUCCESS)
 
-        # Start the loop thread
-        threading.Thread(target=self._threaded_find_click_type_LOOP, args=(clean_lines,), daemon=True).start()
+        threading.Thread(target=self._threaded_find_click_type_LOOP, args=(valid_pairs,), daemon=True).start()
 
-    def _threaded_find_click_type_LOOP(self, clean_lines):
-        """
-        The main 'while true' loop for auto-typing.
-        Ang loop ay magsa-success at magbe-break pagkatapos ng ISANG cycle.
-        """
-        import uuid  # Re-added import for UI Automator cleanup
+    def stop_auto_type_loop(self):
+        self.is_auto_typing.clear()
+
+        if hasattr(self, 'find_click_type_button') and self.find_click_type_button.winfo_exists():
+            self.find_click_type_button.configure(text="⚡ START AUTO-TYPE ⚡",
+                                                  fg_color=self.COLOR_ACCENT,
+                                                  hover_color=self.COLOR_ACCENT_HOVER,
+                                                  text_color=self.COLOR_BACKGROUND)
+
+    def toggle_auto_type_loop(self):
+        if self.is_auto_typing.is_set():
+            self.stop_auto_type_loop()
+        else:
+            self.start_auto_type_loop()
+
+    def _run_task_with_retry(self, serial, text_to_send, pair_index, max_retries=5):
+        for attempt in range(max_retries):
+            if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                return False, "Stop requested"
+
+            success, message = self._run_find_click_type_on_device(serial, text_to_send)
+
+            if success:
+                self.after(0, lambda: self.status_label.configure(
+                    text=f"✅ Pair {pair_index} on {serial} SUCCESSFUL (Attempt {attempt + 1}).",
+                    text_color=self.COLOR_SUCCESS))
+                return True, message
+            else:
+                if attempt < max_retries - 1:
+                    wait_time = 3 + attempt * 2
+                    self.after(0, lambda: self.status_label.configure(
+                        text=f"⚠️ Pair {pair_index} on {serial}: Failed ({message}). Retrying in {wait_time}s (Attempt {attempt + 2}/{max_retries}).",
+                        text_color=self.COLOR_WARNING))
+
+                    time.sleep(wait_time)
+                else:
+                    self.after(0, lambda: self.status_label.configure(
+                        text=f"❌ Pair {pair_index} on {serial}: FAILED after {max_retries} attempts ({message}). Moving to next pair.",
+                        text_color=self.COLOR_DANGER))
+                    return False, message
+
+        return False, "Max retries reached"
+
+    def _threaded_find_click_type_LOOP(self, valid_pairs):
         try:
-            # Loop will run AT LEAST once since self.is_auto_typing is set
             while self.is_auto_typing.is_set() and not is_stop_requested.is_set():
-                print("\n🔄 Starting new auto-type cycle...")
+
+                success_achieved_in_this_cycle = False
 
                 if not self.devices:
                     self.after(0, lambda: self.status_label.configure(text="⚠️ No devices, stopping loop.",
-                                                                      text_color="#ffc107"))
+                                                                      text_color=self.COLOR_WARNING))
                     break
 
-                # Run the task on all devices concurrently for this one cycle
-                futures = []
-                for serial in self.devices:
+                for index, selected_pair in enumerate(valid_pairs):
                     if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
                         break
 
-                    random_text = random.choice(clean_lines)
-                    futures.append(self.executor.submit(self._run_find_click_type_on_device, serial, random_text))
+                    share_url = selected_pair['url']
+                    file_path = selected_pair['file']
+                    pair_index = index + 1
+                    total_pairs = len(valid_pairs)
 
-                # Wait for this cycle to finish
-                if futures:
-                    concurrent.futures.wait(futures)
+                    self.after(0, lambda: self.status_label.configure(
+                        text=f"[CMD] Processing Pair {pair_index}/{total_pairs}: Opening {share_url[:20]}...",
+                        # Changed text to reflect deep linking
+                        text_color=self.COLOR_ACCENT))
 
-                # Check for stop signals again
-                if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                    clean_lines = []
+                    has_caption = False
+
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                lines = f.readlines()
+                            clean_lines = [line.strip() for line in lines if line.strip()]
+
+                            if clean_lines:
+                                has_caption = True
+                            else:
+                                self.after(0, lambda: self.status_label.configure(
+                                    text=f"⚠️ Comment file '{os.path.basename(file_path)}' is empty. Share-only mode.",
+                                    text_color=self.COLOR_WARNING))
+                        except Exception as e:
+                            self.after(0, lambda: self.status_label.configure(
+                                text=f"❌ Error reading file: {e}. Share-only mode.", text_color=self.COLOR_DANGER))
+                    else:
+                        self.after(0, lambda: self.status_label.configure(
+                            text=f"ℹ️ No comment file for Pair {pair_index}. Share-only mode.",
+                            text_color=self.COLOR_TEXT_SECONDARY))
+
+                    # --- FIXED DEEP LINKING COMMAND ---
+                    share_command = [
+                        'shell', 'am', 'start',
+                        '-a', 'android.intent.action.VIEW',  # ACTION_VIEW for deep linking
+                        '-d', f'"{share_url}"',  # -d for the data URI (URL)
+                        TIKTOK_LITE_PACKAGE
+                    ]
+                    # --- END FIXED DEEP LINKING COMMAND ---
+
+                    share_futures = []
+                    for serial in self.devices:
+                        if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                            break
+                        share_futures.append(self.executor.submit(run_adb_command, share_command, serial))
+
+                    concurrent.futures.wait(share_futures)
+
+                    time.sleep(5)
+
+                    if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                        break
+
+                    if has_caption:
+                        self.after(0, lambda: self.status_label.configure(
+                            text=f"[CMD] Pair {pair_index}: Starting typing and retry attempts...",
+                            text_color=self.COLOR_ACCENT))
+
+                        futures = []
+                        for serial in self.devices:
+                            if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                                break
+
+                            random_text = random.choice(clean_lines)
+                            futures.append(
+                                self.executor.submit(self._run_task_with_retry, serial, random_text, pair_index))
+
+                        concurrent.futures.wait(futures)
+
+                        pair_success = False
+                        for future in futures:
+                            if future.exception() is None:
+                                success, _ = future.result()
+                                if success:
+                                    pair_success = True
+                    else:
+                        self.after(0, lambda: self.status_label.configure(
+                            text=f"✅ Pair {pair_index}: SHARE-ONLY complete.",
+                            text_color=self.COLOR_SUCCESS))
+                        pair_success = True
+
+                    if pair_success:
+                        success_achieved_in_this_cycle = True
+
+                    COOLDOWN = 10
+                    self.after(0, lambda: self.status_label.configure(
+                        text=f"[SYS] Pair {pair_index} processed. Waiting {COOLDOWN}s before next pair...",
+                        text_color=self.COLOR_TEXT_SECONDARY))
+
+                    for _ in range(COOLDOWN):
+                        if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                            break
+                        time.sleep(1)
+
+                    if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                        break
+
+                if success_achieved_in_this_cycle:
+                    self.after(0, lambda: self.status_label.configure(
+                        text="✅ AUTO-TYPE SUCCESSFUL (Posted/Shared). Stopping loop.",
+                        text_color=self.COLOR_SUCCESS))
                     break
+                else:
+                    self.after(0, lambda: self.status_label.configure(
+                        text="[SYS] All pairs processed (No successful post). Waiting 5s for next cycle...",
+                        text_color=self.COLOR_TEXT_PRIMARY))
 
-                # I-update ang status at mag-break
-                self.after(0, lambda: self.status_label.configure(
-                    text="[SUCCESS] Auto-type cycle complete. Stopping loop.", text_color=self.ACCENT_COLOR))
-
-                # ITO ANG NAGPAPATIGIL NG LOOP MATAPOS ANG ISANG SUCCESSFUL RUN
-                break
-
+                    wait_duration = 5
+                    for _ in range(wait_duration):
+                        if not self.is_auto_typing.is_set() or is_stop_requested.is_set():
+                            break
+                        time.sleep(1)
 
         except Exception as e:
-            print(f"Error in auto-type loop: {e}")
-            # Tanggalin ang 'pass' at gawing visible ang error para sa debugging
+            self.after(0, lambda: self.status_label.configure(
+                text=f"❌ CRITICAL ERROR in auto-type task: {e}", text_color=self.COLOR_DANGER))
         finally:
-            # Loop ended (either by toggle, global stop, or successful completion/break)
-            # Reset the button in the main thread
-            self.after(0, self.reset_auto_type_button)
+            self.after(0, self.stop_auto_type_loop)
 
     def _run_find_click_type_on_device(self, serial, text_to_send):
-        """
-        The core logic that runs on each device to find, click, and type.
-        Returns (bool success, str message)
-        """
-        import uuid  # Re-added import for UI Automator cleanup
         local_xml_file = f"ui_dump_{serial}_{uuid.uuid4()}.xml"
 
+        # --- CONSTANTS ---
+        COMMENT_BUTTON_ID = "com.zhiliaoapp.musically.go:id/dj4"
+        POST_BUTTON_ID = "com.zhiliaoapp.musically.go:id/e_x"
+
         try:
-            # Step 1: Dump UI
-            dump_cmd = ['shell', 'uiautomator', 'dump', '/data/local/tmp/ui.xml']
-            success, out = run_adb_command(dump_cmd, serial)
-            if not success:
-                # print(f"[{serial}] Failed to dump UI.")
-                return False, "Failed to dump UI"
+            # 1. DUMP UI (Pre-tap)
+            if self.is_auto_typing.is_set() and not is_stop_requested.is_set():
+                dump_cmd = ['shell', 'uiautomator', 'dump', '/data/local/tmp/ui.xml']
+                success, out = run_adb_command(dump_cmd, serial)
+                if not success:
+                    return False, "Failed to dump UI (Pre-tap)"
+            else:
+                return False, "Stop requested"
 
-            # Step 2: Pull XML
-            pull_cmd = ['pull', '/data/local/tmp/ui.xml', local_xml_file]
-            success, out = run_adb_command(pull_cmd, serial)
-            if not success:
-                # print(f"[{serial}] Failed to pull UI XML.")
-                return False, "Failed to pull UI XML"
+            # 2. PULL UI XML (Pre-tap)
+            if self.is_auto_typing.is_set() and not is_stop_requested.is_set():
+                pull_cmd = ['pull', '/data/local/tmp/ui.xml', local_xml_file]
+                success, out = run_adb_command(pull_cmd, serial)
+                if not success:
+                    return False, "Failed to pull UI XML (Pre-tap)"
+            else:
+                return False, "Stop requested"
 
-            # Step 3: Parse XML
             if not os.path.exists(local_xml_file):
-                # print(f"[{serial}] XML file not found locally.")
-                return False, "XML file not found"
+                return False, "XML file not found (Pre-tap)"
 
             tree = ET.parse(local_xml_file)
             root = tree.getroot()
 
-            # Step 4: Find EditText
-            # Find the first node with class="android.widget.EditText"
+            # 3. FIND AND TAP COMMENT BUTTON (dj4)
+            if self.is_auto_typing.is_set() and not is_stop_requested.is_set():
+
+                comment_button_node = root.find(f'.//node[@resource-id="{COMMENT_BUTTON_ID}"]')
+
+                if comment_button_node is not None:
+                    bounds_str = comment_button_node.get('bounds')
+                    coords = re.findall(r'\d+', bounds_str)
+                    if len(coords) < 4:
+                        return False, f"Invalid bounds string for comment button '{COMMENT_BUTTON_ID}'"
+
+                    x1, y1, x2, y2 = map(int, coords[:4])
+
+                    tap_x = (x1 + x2) // 2
+                    tap_y = (y1 + y2) // 2
+
+                    # Tap the comment button
+                    tap_cmd = ['shell', 'input', 'tap', str(tap_x), str(tap_y)]
+                    success, out = run_adb_command(tap_cmd, serial)
+                    if not success:
+                        return False, "Failed to tap the comment button (dj4)"
+
+                    # --- MODIFIED: Reduced delay from 3s to 1.5s ---
+                    time.sleep(1.5)
+
+                    # RERUN DUMP/PULL TO GET THE NEW SCREEN WITH EDITTEXT
+
+            if self.is_auto_typing.is_set() and not is_stop_requested.is_set():
+                # Re-dump UI
+                dump_cmd = ['shell', 'uiautomator', 'dump', '/data/local/tmp/ui.xml']
+                success, out = run_adb_command(dump_cmd, serial)
+                if not success:
+                    return False, "Failed to dump UI (Post-tap)"
+
+                # Re-pull XML
+                pull_cmd = ['pull', '/data/local/tmp/ui.xml', local_xml_file]
+                success, out = run_adb_command(pull_cmd, serial)
+                if not success:
+                    return False, "Failed to pull UI XML (Post-tap)"
+
+                tree = ET.parse(local_xml_file)
+                root = tree.getroot()
+            else:
+                return False, "Stop requested"
+
+            # 4. FIND & TAP EDITTEXT
             edit_text_node = root.find('.//node[@class="android.widget.EditText"]')
 
             if edit_text_node is None:
-                # print(f"[{serial}] No EditText found.")
-                return False, "No EditText found"
+                return False, "No EditText found (Comment box not ready/visible)"
 
-            # Step 5: Get Bounds
-            bounds_str = edit_text_node.get('bounds')  # e.g., "[100,200][300,400]"
+            bounds_str = edit_text_node.get('bounds')
             if not bounds_str:
-                # print(f"[{serial}] EditText found but has no bounds.")
-                return False, "EditText has no bounds"
+                return False, "EditText found but has no bounds"
 
             coords = re.findall(r'\d+', bounds_str)
-            if len(coords) < 4:
-                # print(f"[{serial}] Invalid bounds string.")
-                return False, "Invalid bounds string"
-
             x1, y1, x2, y2 = map(int, coords[:4])
-
-            # Step 6: Calculate Center
             tap_x = (x1 + x2) // 2
             tap_y = (y1 + y2) // 2
 
-            # Step 7: Click
-            tap_cmd = ['shell', 'input', 'tap', str(tap_x), str(tap_y)]
-            success, out = run_adb_command(tap_cmd, serial)
-            if not success:
-                # print(f"[{serial}] Failed to tap.")
-                return False, "Failed to tap"
+            if self.is_auto_typing.is_set() and not is_stop_requested.is_set():
+                # Tap EditText
+                tap_cmd = ['shell', 'input', 'tap', str(tap_x), str(tap_y)]
+                success, out = run_adb_command(tap_cmd, serial)
+                if not success:
+                    return False, "Failed to tap EditText"
 
-            # Short delay after tapping before typing
-            time.sleep(0.5)
+                # --- MODIFIED: Reduced delay from 1s to 0.5s ---
+                time.sleep(0.5)
 
-            # Step 8: Type
-            run_text_command(text_to_send, serial)
-            # print(f"[{serial}] Click and type successful.")
+                # 5. TYPE TEXT & SEND ENTER
+            if self.is_auto_typing.is_set() and not is_stop_requested.is_set():
+                # Type text
+                run_text_command(text_to_send, serial)
+
+                # --- MODIFIED: Reduced delay from 1s to 0.5s ---
+                time.sleep(0.5)
+
+                # Send 'ENTER' keyevent (Keycode 66) - This often finalizes the text input
+                post_cmd = ['shell', 'input', 'keyevent', '66']
+                run_adb_command(post_cmd, serial)
+
+                # --- MODIFIED: Reduced delay from 1s to 0.5s ---
+                time.sleep(0.5)
+            else:
+                return False, "Stop requested"
+
+            # --- START: FIND AND TAP POST BUTTON (e_x) ---
+
+            # Re-dump UI to capture the screen state after typing (where the 'Post' button might activate/move)
+            if self.is_auto_typing.is_set() and not is_stop_requested.is_set():
+                dump_cmd = ['shell', 'uiautomator', 'dump', '/data/local/tmp/ui.xml']
+                run_adb_command(dump_cmd, serial)
+
+                pull_cmd = ['pull', '/data/local/tmp/ui.xml', local_xml_file]
+                run_adb_command(pull_cmd, serial)
+
+                tree = ET.parse(local_xml_file)
+                root = tree.getroot()
+                time.sleep(0.5)  # Small pause after dump/pull
+            else:
+                return False, "Stop requested"
+
+            # Find the 'Post' button by resource-id
+            post_button_node = root.find(f'.//node[@resource-id="{POST_BUTTON_ID}"]')
+
+            if post_button_node is None:
+                return False, f"Post button '{POST_BUTTON_ID}' not found after typing/enter. Failed to post."
+            else:
+                bounds_str = post_button_node.get('bounds')
+                if not bounds_str:
+                    return False, f"Post button '{POST_BUTTON_ID}' found but has no bounds"
+
+                coords = re.findall(r'\d+', bounds_str)
+                if len(coords) < 4:
+                    return False, f"Invalid bounds string for Post button '{POST_BUTTON_ID}'"
+
+                x1, y1, x2, y2 = map(int, coords[:4])
+
+                tap_x = (x1 + x2) // 2
+                tap_y = (y1 + y2) // 2
+
+                # Tap the post button to send the comment
+                tap_cmd = ['shell', 'input', 'tap', str(tap_x), str(tap_y)]
+                success, out = run_adb_command(tap_cmd, serial)
+                if not success:
+                    return False, "Failed to tap the Post button (e_x)"
+
+                # --- MODIFIED: Reduced delay from 1s to 0.5s ---
+                time.sleep(0.5)
+                # --- END: FIND AND TAP POST BUTTON (e_x) ---
+
             return True, "Success"
 
         except ET.ParseError:
-            # print(f"[{serial}] Failed to parse XML.")
             return False, "Failed to parse XML"
         except Exception as e:
-            # print(f"[{serial}] Error in find/click/type: {e}")
             return False, str(e)
         finally:
-            # Step 9: Cleanup
             if os.path.exists(local_xml_file):
                 os.remove(local_xml_file)
 
-    def reset_auto_type_button(self):
-        """Resets the auto-type button to its 'START' state."""
-        self.is_auto_typing.clear()
-
-        # Check if button exists before configuring (in case window is closing)
-        if hasattr(self, 'find_click_type_button') and self.find_click_type_button.winfo_exists():
-            self.find_click_type_button.configure(text="START AUTO-TYPE ⌨️",
-                                                  fg_color="#3A3A3A",
-                                                  hover_color="#555555")
-
-        if hasattr(self, 'status_label') and self.status_label.winfo_exists():
-            # Only update status if it's not a global stop
-            if not is_stop_requested.is_set():
-                self.status_label.configure(text="[CMD] Auto-type loop Done.", text_color=self.ACCENT_COLOR)
-
-    # --- End of new methods ---
-
     def remove_emojis_from_file(self):
-        file_path = self.file_path_entry.get()
+        if not self.share_pairs:
+            self.status_label.configure(text="⚠️ Please add a Link/Comment Pair first.", text_color=self.COLOR_WARNING)
+            return
+
+        file_path = self.share_pairs[0]['file_entry'].get()
         if not file_path:
-            self.status_label.configure(text="⚠️ Please select a text file first.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ Please select a text file for the first pair.",
+                                        text_color=self.COLOR_WARNING)
             return
 
         try:
-            # Pattern to match a wide range of Unicode emojis and symbols
             emoji_pattern = re.compile("["
-                                       "\U0001F600-\U0001F64F"  # emoticons
-                                       "\U0001F300-\U0001F5FF"  # symbols & pictographs
-                                       "\U0001F680-\U0001F6FF"  # transport & map symbols
-                                       "\U0001F700-\U0001F77F"  # alchemical symbols
-                                       "\U0001F780-\U0001F7FF"  # Geometric Shapes Extended
-                                       "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
-                                       "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
-                                       "\U0001FA00-\U0001FA6F"  # Chess Symbols
-                                       "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
-                                       "\U00002702-\U000027B0"  # Dingbats
-                                       "\U00002600-\U000026FF"  # Miscellaneous Symbols
-                                       "\U000025A0-\U000025FF"  # Geometric Shapes
+                                       "\U0001F600-\U0001F64F"
+                                       "\U0001F300-\U0001F5FF"
+                                       "\U0001F680-\U0001F6FF"
+                                       "\U0001F700-\U0001F77F"
+                                       "\U0001F780-\U0001F7FF"
+                                       "\U0001F800-\U0001F8FF"
+                                       "\U0001F900-\U0001F9FF"
+                                       "\U0001FA00-\U0001FA6F"
+                                       "\U0001FA70-\U0001FAFF"
+                                       "\U00002702-\U000027B0"
+                                       "\U00002600-\U000026FF"
+                                       "\U000025A0-\U000025FF"
                                        "]+", flags=re.UNICODE)
 
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -1181,20 +1246,21 @@ class AdbControllerApp(ctk.CTk):
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(cleaned_content)
 
-            self.status_label.configure(text="✅ EMOJIS REMOVED from file.",
-                                        text_color=self.SUCCESS_COLOR)
+            self.status_label.configure(text=f"✅ EMOJIS REMOVED from file: {os.path.basename(file_path)}.",
+                                        text_color=self.COLOR_SUCCESS)
 
         except FileNotFoundError:
-            self.status_label.configure(text="❌ ERROR: File not found.", text_color=self.DANGER_COLOR)
+            self.status_label.configure(text="❌ ERROR: File not found.", text_color=self.COLOR_DANGER)
         except Exception as e:
-            self.status_label.configure(text=f"❌ ERROR: An error occurred: {e}", text_color=self.DANGER_COLOR)
+            self.status_label.configure(text=f"❌ ERROR: An error occurred: {e}", text_color=self.COLOR_DANGER)
+
+    # --- Device Management & UI (Fixed Logic) ---
 
     def detect_devices(self):
         self.stop_capture()
 
         for widget in self.device_view_panel.winfo_children():
-            if widget != self.stop_all_button:
-                widget.destroy()
+            widget.destroy()
 
         self.device_frames = {}
         self.device_canvases = {}
@@ -1202,9 +1268,8 @@ class AdbControllerApp(ctk.CTk):
         self.press_start_coords = {}
         self.press_time = {}
         self.selected_device_serial = None
-        self.device_listbox.delete(0, tk.END)
         self.devices = []
-        self.status_label.configure(text="[SYS] Detecting devices...", text_color=self.ACCENT_COLOR)
+        self.status_label.configure(text="[SYS] Detecting devices...", text_color=self.COLOR_ACCENT)
 
         try:
             result = subprocess.run(['adb', 'devices'], capture_output=True, text=True, check=True, timeout=10)
@@ -1212,8 +1277,10 @@ class AdbControllerApp(ctk.CTk):
             self.devices = [line.split('\t')[0] for line in devices_output if line.strip() and 'device' in line]
         except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
             messagebox.showerror("Error", "ADB is not installed, not in your system PATH, or timed out.")
-            self.status_label.configure(text="❌ ERROR: ADB not found or timed out.", text_color=self.DANGER_COLOR)
+            self.status_label.configure(text="❌ ERROR: ADB not found or timed out.", text_color=self.COLOR_DANGER)
             self.device_count_label.configure(text="DEVICES: 0")
+            self.device_option_menu.configure(values=["No devices found"], state="disabled")
+            self.device_selector_var.set("No devices found")
             return
 
         self.device_count_label.configure(text=f"DEVICES: {len(self.devices)}")
@@ -1221,32 +1288,27 @@ class AdbControllerApp(ctk.CTk):
         if not self.devices:
             no_devices_label = ctk.CTkLabel(self.device_view_panel,
                                             text="NO DEVICES FOUND.\nEnsure USB debugging is enabled.",
-                                            font=ctk.CTkFont(size=18, weight="bold"), text_color="#A9A9A9")
+                                            font=self.FONT_HEADING, text_color=self.COLOR_TEXT_SECONDARY)
             no_devices_label.pack(expand=True)
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
-            return
+            self.status_label.configure(text="⚠️ No devices detected.", text_color=self.COLOR_WARNING)
+            self.device_option_menu.configure(values=["No devices found"], state="disabled")
+            self.device_selector_var.set("No devices found")
         else:
-            self.status_label.configure(text=f"✅ {len(self.devices)} devices connected.", text_color=self.SUCCESS_COLOR)
+            self.status_label.configure(text=f"✅ {len(self.devices)} devices connected.", text_color=self.COLOR_SUCCESS)
+            self.device_option_menu.configure(values=self.devices, state="normal")
+            self.device_selector_var.set(self.devices[0])
+            self.on_device_select_menu(self.devices[0])
 
-        for serial in self.devices:
-            self.device_listbox.insert(tk.END, serial)
-
-        if self.devices:
-            self.device_listbox.selection_set(0)
-            self.on_device_select()
-
-    def on_device_select(self, event=None):
-        selected_index = self.device_listbox.curselection()
-        if not selected_index:
+    def on_device_select_menu(self, selected_serial):
+        """FIXED: Uses selected_serial parameter correctly."""
+        if not selected_serial or selected_serial == "No devices found":
             return
 
-        new_serial = self.device_listbox.get(selected_index[0])
         self.stop_capture()
-        self.selected_device_serial = new_serial
+        self.selected_device_serial = selected_serial  # FIXED: Changed 'serial' to 'selected_serial'
 
         for widget in self.device_view_panel.winfo_children():
-            if widget != self.stop_all_button:
-                widget.destroy()
+            widget.destroy()
 
         self.device_frames = {}
         self.device_canvases = {}
@@ -1263,7 +1325,6 @@ class AdbControllerApp(ctk.CTk):
             self.after_cancel(self.update_image_id)
             self.update_image_id = None
         if self.capture_thread and self.capture_thread.is_alive():
-            # capture_thread should terminate itself because self.is_capturing is False
             pass
         self.screenshot_queue.queue.clear()
 
@@ -1283,22 +1344,15 @@ class AdbControllerApp(ctk.CTk):
                     self.is_capturing = False
                     break
 
-                # The 'exec-out' command is faster and avoids file I/O on the device
                 process = subprocess.run(['adb', '-s', self.selected_device_serial, 'exec-out', 'screencap', '-p'],
                                          capture_output=True, check=True, timeout=5)
                 self.screenshot_queue.put(process.stdout)
-            except subprocess.CalledProcessError as e:
-                # print(f"Error capturing screen: {e.stderr.decode()}")
+            except subprocess.CalledProcessError:
                 self.is_capturing = False
             except subprocess.TimeoutExpired:
-                # print(f"Screen capture timed out for device {self.selected_device_serial}")
                 pass
-            except Exception as e:
-                # print(f"An error occurred in capture loop: {e}")
+            except Exception:
                 self.is_capturing = False
-
-            # if self.is_capturing:
-            #     time.sleep(0.05)  # Throttle screen capture rate
 
     def update_image(self):
         try:
@@ -1319,7 +1373,6 @@ class AdbControllerApp(ctk.CTk):
                     img_width, img_height = pil_image.size
                     aspect_ratio = img_width / img_height
 
-                    # Maintain aspect ratio logic (9:16)
                     if canvas_width / canvas_height > aspect_ratio:
                         new_height = canvas_height
                         new_width = int(new_height * aspect_ratio)
@@ -1333,7 +1386,6 @@ class AdbControllerApp(ctk.CTk):
 
                         self.device_images[self.selected_device_serial] = {'pil_image': pil_image, 'tk_image': tk_image}
 
-                        # Calculate position for centering the image on the canvas
                         x_pos = canvas_width / 2
                         y_pos = canvas_height / 2
 
@@ -1349,70 +1401,78 @@ class AdbControllerApp(ctk.CTk):
             if self.is_capturing:
                 self.update_image_id = self.after(100, self.update_image)
 
-        except Exception as e:
-            # print(f"Error in update_image: {e}")
+        except Exception:
             self.stop_capture()
 
     def create_device_frame(self, serial):
-        device_frame = ctk.CTkFrame(self.device_view_panel, fg_color=self.FRAME_COLOR, corner_radius=15)
-        device_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        device_frame = ctk.CTkFrame(self.device_view_panel, fg_color="transparent")
+        device_frame.pack(padx=25, pady=25, fill=tk.BOTH, expand=True)
         self.device_frames[serial] = device_frame
 
-        title = ctk.CTkLabel(device_frame, text=f"LIVE CONTROL: {serial}", font=ctk.CTkFont(size=18, weight="bold"),
-                             text_color=self.ACCENT_COLOR)
-        title.pack(pady=(15, 10))
+        title = ctk.CTkLabel(device_frame, text=f"LIVE CONTROL: {serial}", font=self.FONT_HEADING,
+                             text_color=self.COLOR_ACCENT)
+        title.pack(pady=(0, 15))
 
-        # This Frame will contain the canvas and handle its aspect ratio
-        canvas_container = ctk.CTkFrame(device_frame, fg_color=self.BACKGROUND_COLOR, corner_radius=10)
-        canvas_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=(5, 5))
+        canvas_container = ctk.CTkFrame(device_frame, fg_color=self.COLOR_FRAME, corner_radius=12,
+                                        border_width=1, border_color=self.COLOR_BORDER)
+        canvas_container.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
         canvas_container.bind("<Configure>", self.on_canvas_container_resize)
 
-        canvas = tk.Canvas(canvas_container, bg=self.BACKGROUND_COLOR, highlightthickness=0)
+        canvas = tk.Canvas(canvas_container, bg=self.COLOR_FRAME, highlightthickness=0)
         canvas.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         self.device_canvases[serial] = canvas
 
         canvas.bind("<ButtonPress-1>", lambda event: self.start_press(event, serial))
         canvas.bind("<ButtonRelease-1>", lambda event: self.handle_release(event, serial))
 
-        # Action Buttons Frame
+        # --- Button Frame (TWO ROWS) ---
         button_frame = ctk.CTkFrame(device_frame, fg_color="transparent")
-        button_frame.pack(pady=(10, 15))
+        button_frame.pack(pady=(20, 0), fill="x")
 
-        # Adjusted button styling for professional look
-        button_style = {'corner_radius': 8, 'width': 80, 'fg_color': "#3A3A3A", 'hover_color': "#555555",
-                        'text_color': self.TEXT_COLOR}
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
+        button_frame.columnconfigure(2, weight=1)
 
-        # Buttons control the Android device:
+        # Define base style (all common args)
+        button_style = {'corner_radius': 10,
+                        'fg_color': self.COLOR_FRAME,
+                        'hover_color': self.COLOR_BORDER,
+                        'text_color': self.COLOR_TEXT_PRIMARY,
+                        'border_color': self.COLOR_BORDER, 'border_width': 1,
+                        'height': 45, 'font': self.FONT_BUTTON}
 
-        # MINIMIZE / HOME (KEYCODE 3)
+        button_padx = 7
+
+        # ROW 0: Navigation
         home_button = ctk.CTkButton(button_frame, text="HOME 🏠", command=lambda: self.send_adb_keyevent(3),
                                     **button_style)
-        home_button.pack(side=tk.LEFT, padx=5)
+        home_button.grid(row=0, column=0, padx=button_padx, pady=(0, 10), sticky="ew")
 
-        # RESTORE DOWN / BACK (KEYCODE 4)
         back_button = ctk.CTkButton(button_frame, text="BACK ↩️", command=lambda: self.send_adb_keyevent(4),
                                     **button_style)
-        back_button.pack(side=tk.LEFT, padx=5)
+        back_button.grid(row=0, column=1, padx=button_padx, pady=(0, 10), sticky="ew")
 
-        # RECENTS (KEYCODE 187)
         recents_button = ctk.CTkButton(button_frame, text="RECENTS", command=lambda: self.send_adb_keyevent(187),
                                        **button_style)
-        recents_button.pack(side=tk.LEFT, padx=5)
+        recents_button.grid(row=0, column=2, padx=button_padx, pady=(0, 10), sticky="ew")
 
-        # CLOSE / POWER (KEYCODE 26) - Simulates pressing the power button to turn off the screen
-        close_button = ctk.CTkButton(button_frame, text="SCREEN OFF 💡", command=lambda: self.send_adb_keyevent(26),
-                                     corner_radius=8, width=120, fg_color=self.DANGER_COLOR, hover_color="#CC4028",
-                                     text_color=self.ACCENT_COLOR)
-        close_button.pack(side=tk.LEFT, padx=5)
-
-        # Swipes are common actions, keep them here
+        # ROW 1: Actions
         scroll_down_button = ctk.CTkButton(button_frame, text="SCROLL DOWN",
                                            command=lambda: self.send_adb_swipe(serial, 'up'), **button_style)
-        scroll_down_button.pack(side=tk.LEFT, padx=5)
+        scroll_down_button.grid(row=1, column=0, padx=button_padx, sticky="ew")
 
         scroll_up_button = ctk.CTkButton(button_frame, text="SCROLL UP",
                                          command=lambda: self.send_adb_swipe(serial, 'down'), **button_style)
-        scroll_up_button.pack(side=tk.LEFT, padx=5)
+        scroll_up_button.grid(row=1, column=1, padx=button_padx, sticky="ew")
+
+        danger_style = button_style.copy()
+        danger_style['fg_color'] = self.COLOR_DANGER
+        danger_style['hover_color'] = self.COLOR_DANGER_HOVER
+
+        close_button = ctk.CTkButton(button_frame, text="SCREEN OFF 💡", command=lambda: self.send_adb_keyevent(26),
+                                     **danger_style)
+
+        close_button.grid(row=1, column=2, padx=button_padx, sticky="ew")
 
     def on_canvas_container_resize(self, event):
         if not self.selected_device_serial:
@@ -1425,10 +1485,8 @@ class AdbControllerApp(ctk.CTk):
         container_width = event.width
         container_height = event.height
 
-        # Calculate new canvas size to maintain aspect ratio (e.g., 9:16 for most phones)
         aspect_ratio = 9 / 16
 
-        # Determine whether to scale based on width or height
         if container_width / container_height > aspect_ratio:
             new_height = container_height
             new_width = int(new_height * aspect_ratio)
@@ -1436,12 +1494,10 @@ class AdbControllerApp(ctk.CTk):
             new_width = container_width
             new_height = int(new_width / aspect_ratio)
 
-        # Update canvas size and position it in the center
         canvas.configure(width=new_width, height=new_height)
         canvas.place(relx=0.5, rely=0.5, anchor=tk.CENTER, width=new_width, height=new_height)
 
-        # Trigger an image update to resize the image
-        self.after(10, self.update_image)  # Use after to ensure canvas size has updated
+        self.after(10, self.update_image)
 
     def start_press(self, event, serial):
         self.press_time[serial] = time.time()
@@ -1469,14 +1525,11 @@ class AdbControllerApp(ctk.CTk):
         self.press_time.pop(serial, None)
         self.press_start_coords.pop(serial, None)
 
-    # Helper function to get scaled coordinates (reused for tap/long-press/swipe)
     def _get_scaled_coords(self, canvas_x, canvas_y, serial):
-        """Calculates ADB screen coordinates from canvas coordinates."""
         pil_image_info = self.device_images.get(self.selected_device_serial, {})
         pil_image = pil_image_info.get('pil_image')
 
         if not pil_image:
-            # print("Image not loaded for scaling.")
             return None, None
 
         img_width, img_height = pil_image.size
@@ -1487,7 +1540,6 @@ class AdbControllerApp(ctk.CTk):
         canvas_aspect = canvas_width / canvas_height
         image_aspect = img_width / img_height
 
-        # Calculate effective image area on canvas
         if canvas_aspect > image_aspect:
             effective_height = canvas_height
             effective_width = int(effective_height * image_aspect)
@@ -1502,16 +1554,13 @@ class AdbControllerApp(ctk.CTk):
         click_y = canvas_y - image_y_offset
 
         if not (0 <= click_x < effective_width and 0 <= click_y < effective_height):
-            # Click was outside the effective image area
             return None, None
 
-        # Get device screen size from ADB
         try:
             adb_size_output = subprocess.run(['adb', '-s', serial, 'shell', 'wm', 'size'], capture_output=True,
                                              text=True, check=True, timeout=5).stdout.strip()
             adb_width, adb_height = map(int, adb_size_output.split()[-1].split('x'))
         except Exception:
-            # print("Could not get device screen size.")
             return None, None
 
         scaled_x = int(click_x * adb_width / effective_width)
@@ -1522,55 +1571,52 @@ class AdbControllerApp(ctk.CTk):
     def send_adb_tap(self, event, serial):
         scaled_x, scaled_y = self._get_scaled_coords(event.x, event.y, serial)
         if scaled_x is None:
-            self.status_label.configure(text=f"⚠️ Tap ignored (outside screen area).", text_color="#ffc107")
+            self.status_label.configure(text=f"⚠️ Tap ignored (outside screen area).", text_color=self.COLOR_WARNING)
             return
 
         command = ['shell', 'input', 'tap', str(scaled_x), str(scaled_y)]
         for device_serial in self.devices:
             self.executor.submit(run_adb_command, command, device_serial)
-        self.status_label.configure(text=f"✅ TAP command sent.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text=f"✅ TAP command sent.", text_color=self.COLOR_SUCCESS)
 
     def send_adb_long_press(self, event, serial):
         scaled_x, scaled_y = self._get_scaled_coords(event.x, event.y, serial)
         if scaled_x is None:
-            self.status_label.configure(text=f"⚠️ Long press ignored (outside screen area).", text_color="#ffc107")
+            self.status_label.configure(text=f"⚠️ Long press ignored (outside screen area).",
+                                        text_color=self.COLOR_WARNING)
             return
 
-        # Long press is implemented as a swipe from (x, y) to (x, y) over 1000ms
         command = ['shell', 'input', 'swipe', str(scaled_x), str(scaled_y), str(scaled_x), str(scaled_y), '1000']
         for device_serial in self.devices:
             self.executor.submit(run_adb_command, command, device_serial)
-        self.status_label.configure(text=f"✅ LONG PRESS command sent.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text=f"✅ LONG PRESS command sent.", text_color=self.COLOR_SUCCESS)
 
     def send_adb_swipe_command(self, start_x, start_y, end_x, end_y, serial):
         scaled_start_x, scaled_start_y = self._get_scaled_coords(start_x, start_y, serial)
         scaled_end_x, scaled_end_y = self._get_scaled_coords(end_x, end_y, serial)
 
         if scaled_start_x is None or scaled_end_x is None:
-            self.status_label.configure(text=f"⚠️ Swipe ignored (outside screen area).", text_color="#ffc107")
+            self.status_label.configure(text=f"⚠️ Swipe ignored (outside screen area).", text_color=self.COLOR_WARNING)
             return
 
-        # Swipe duration set to 300ms
         command = ['shell', 'input', 'swipe',
                    str(scaled_start_x), str(scaled_start_y),
                    str(scaled_end_x), str(scaled_end_y), '300']
 
         for device_serial in self.devices:
             self.executor.submit(run_adb_command, command, device_serial)
-        self.status_label.configure(text=f"✅ SWIPE command sent.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text=f"✅ SWIPE command sent.", text_color=self.COLOR_SUCCESS)
 
     def send_adb_swipe(self, serial, direction):
-        # This method handles the pre-defined scroll up/down buttons
         try:
             adb_width_str = subprocess.run(['adb', '-s', serial, 'shell', 'wm', 'size'], capture_output=True, text=True,
                                            check=True).stdout.strip().split()[-1]
             adb_width, adb_height = map(int, adb_width_str.split('x'))
 
-            # Fixed swipe coordinates for a full-screen scroll
-            if direction == 'down':  # Scroll down (swipe up)
-                start_x, start_y = adb_width // 2, adb_height // 4 * 3  # Bottom quarter
-                end_x, end_y = start_x, adb_height // 4  # Top quarter
-            elif direction == 'up':  # Scroll up (swipe down)
+            if direction == 'down':
+                start_x, start_y = adb_width // 2, adb_height // 4 * 3
+                end_x, end_y = start_x, adb_height // 4
+            elif direction == 'up':
                 start_x, start_y = adb_width // 2, adb_height // 4
                 end_x, end_y = start_x, adb_height // 4 * 3
 
@@ -1579,10 +1625,10 @@ class AdbControllerApp(ctk.CTk):
             for device_serial in self.devices:
                 self.executor.submit(run_adb_command, command, device_serial)
             self.status_label.configure(text=f"✅ {direction.upper()} SCROLL command sent.",
-                                        text_color=self.SUCCESS_COLOR)
+                                        text_color=self.COLOR_SUCCESS)
         except Exception as e:
             self.status_label.configure(text=f"❌ ERROR: Failed to send scroll command: {e}",
-                                        text_color=self.DANGER_COLOR)
+                                        text_color=self.COLOR_DANGER)
 
     def send_adb_keyevent(self, keycode):
         command = ['shell', 'input', 'keyevent', str(keycode)]
@@ -1591,73 +1637,86 @@ class AdbControllerApp(ctk.CTk):
 
         key_name = {3: "HOME", 4: "BACK", 187: "RECENTS", 24: "VOL UP", 25: "VOL DOWN", 26: "POWER/SCREEN OFF"}.get(
             keycode, "KEY EVENT")
-        self.status_label.configure(text=f"✅ {key_name} command sent.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text=f"✅ {key_name} command sent.", text_color=self.COLOR_SUCCESS)
 
-    # --- TikTok Specific Methods (Kept) ---
+    # --- TikTok Lite Specific Methods (UPDATED PACKAGE & ACTIVITY) ---
 
     def open_tiktok_lite_deeplink(self):
         post_url = self.tiktok_url_entry.get()
         if not post_url or not self.devices:
-            self.status_label.configure(text="⚠️ Check URL and devices.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ Check URL and devices.", text_color=self.COLOR_WARNING)
             return
 
-        self.status_label.configure(text=f"[CMD] Opening TikTok URL...", text_color=self.ACCENT_COLOR)
+        self.status_label.configure(text=f"[CMD] Opening TikTok video URL...", text_color=self.COLOR_ACCENT)
 
         command = [
             'shell', 'am', 'start',
             '-a', 'android.intent.action.VIEW',
             '-d', f'"{post_url}"',
-            'com.zhiliaoapp.musically.go'
+            TIKTOK_LITE_PACKAGE
         ]
         for device_serial in self.devices:
             self.executor.submit(run_adb_command, command, device_serial)
-        self.status_label.configure(text="✅ Visited TikTok post on all devices.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text="✅ Visited TikTok video on all devices.", text_color=self.COLOR_SUCCESS)
 
     def launch_tiktok_lite(self):
         if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ No devices detected.", text_color=self.COLOR_WARNING)
             return
 
-        self.status_label.configure(text=f"[CMD] Launching TikTok Lite...", text_color=self.ACCENT_COLOR)
+        self.status_label.configure(text=f"[CMD] Launching TikTok Lite...", text_color=self.COLOR_ACCENT)
 
-        command = ['shell', 'am', 'start', '-n',
-                   'com.zhiliaoapp.musically.go/com.ss.android.ugc.aweme.main.homepage.MainActivity']
+        # Ginamit ang bagong package at activity
+        command = ['shell', 'am', 'start', '-n', f'{TIKTOK_LITE_PACKAGE}/{TIKTOK_LITE_ACTIVITY}']
         for device_serial in self.devices:
             self.executor.submit(run_adb_command, command, device_serial)
-        self.status_label.configure(text="✅ Launched TikTok Lite on all devices.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text="✅ Launched TikTok Lite on all devices.", text_color=self.COLOR_SUCCESS)
 
     def force_stop_tiktok_lite(self):
         if not self.devices:
-            self.status_label.configure(text="⚠️ No devices detected.", text_color="#ffc107")
+            self.status_label.configure(text="⚠️ No devices detected.", text_color=self.COLOR_WARNING)
             return
 
-        self.status_label.configure(text=f"[CMD] Force stopping TikTok Lite...", text_color=self.DANGER_COLOR)
+        self.status_label.configure(text=f"[CMD] Force stopping TikTok Lite...", text_color=self.COLOR_DANGER)
 
-        command = ['shell', 'am', 'force-stop', 'com.zhiliaoapp.musically.go']
+        command = ['shell', 'am', 'force-stop', TIKTOK_LITE_PACKAGE]
         for device_serial in self.devices:
             self.executor.submit(run_adb_command, command, device_serial)
-        self.status_label.configure(text="✅ Force stopped TikTok Lite on all devices.", text_color=self.SUCCESS_COLOR)
+        self.status_label.configure(text="✅ Force stopped TikTok Lite on all devices.", text_color=self.COLOR_SUCCESS)
 
-    # --- Removed other app specific methods (FB Lite, YouTube, Image, FB API) ---
+    def share_image_to_tiktok_lite(self):
+        file_name = self.image_file_name_entry.get()
+        if not file_name or not self.devices:
+            self.status_label.configure(text="⚠️ Check image filename and devices.", text_color=self.COLOR_WARNING)
+            return
+
+        self.status_label.configure(text=f"[CMD] Sending sharing intent for '{file_name}'...",
+                                    text_color=self.COLOR_ACCENT)
+
+        device_path = f'/sdcard/Download/{file_name}'
+        command = [
+            'shell', 'am', 'start',
+            '-a', 'android.intent.action.SEND',
+            '-t', 'image/jpeg',
+            '--eu', 'android.intent.extra.STREAM', f'file://{device_path}',
+            TIKTOK_LITE_PACKAGE
+        ]
+        for device_serial in self.devices:
+            self.executor.submit(run_adb_command, command, device_serial)
+        self.status_label.configure(text="✅ Image sharing command sent to all devices.", text_color=self.COLOR_SUCCESS)
 
     def stop_all_commands(self):
-        self.status_label.configure(text="⚠️ TERMINATING ALL ACTIVE COMMANDS...", text_color="#ffc107")
+        self.status_label.configure(text="⚠️ TERMINATING ALL ACTIVE COMMANDS...", text_color=self.COLOR_WARNING)
         is_stop_requested.set()
 
-        # --- NEW: Also clear the auto-type flag ---
-        self.is_auto_typing.clear()
+        self.stop_auto_type_loop()
 
-        # Wait for all current tasks to finish (or be terminated)
         self.executor.shutdown(wait=True)
 
-        # Reset the executor and the flag for new commands
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count() * 4)
         is_stop_requested.clear()
 
-        self.status_label.configure(text="✅ ALL OPERATIONS TERMINATED. Ready.", text_color=self.SUCCESS_COLOR)
-
-        # Also reset the button state just in case
-        self.reset_auto_type_button()
+        self.status_label.configure(text="✅ ALL OPERATIONS TERMINATED. Ready.", text_color=self.COLOR_SUCCESS)
 
 
 if __name__ == '__main__':
