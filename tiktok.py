@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 
 # --- App Version and Update URL ---
 __version__ = "1.4.0"  # Updated version number
-UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/main.py"
+UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tiktok.py"
 VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/version.txt"
 
 # --- GLOBAL CONSTANTS for TikTok Lite (UPDATED) ---
@@ -1723,3 +1723,4 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
     app = AdbControllerApp()
     app.mainloop()
+
