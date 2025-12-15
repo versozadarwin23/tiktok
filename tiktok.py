@@ -24,8 +24,8 @@ import xml.etree.ElementTree as ET
 
 # --- App Version and Update URL ---
 __version__ = "1.4.0"  # Updated version number
-UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/adbtool/refs/heads/main/main.py"
-VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/adbtool/refs/heads/main/version.txt"
+UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/main.py"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/version.txt"
 
 # --- GLOBAL CONSTANTS for TikTok Lite (UPDATED) ---
 TIKTOK_LITE_PACKAGE = "com.zhiliaoapp.musically.go"
