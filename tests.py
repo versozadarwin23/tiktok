@@ -24,7 +24,7 @@ from zipfile import BadZipFile
 
 # --- App Version and Update URL ---
 
-__version__ = "V4"
+__version__ = "V5"
 
 UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tests.py"
 
@@ -51,14 +51,19 @@ def cprint(text, color=""):
 def cinput(prompt):
     """Centered input prompt."""
     import re
+    # Strip leading \n from prompt and print separately so centering is accurate
+    clean_prompt = prompt.lstrip('\n')
+    leading_newlines = len(prompt) - len(clean_prompt)
+    if leading_newlines:
+        print('\n' * (leading_newlines - 1))
     ansi_escape = re.compile(r'\033\[[0-9;]*m')
-    visible = ansi_escape.sub('', prompt)
+    visible = ansi_escape.sub('', clean_prompt)
     try:
         cols = os.get_terminal_size().columns
     except Exception:
         cols = 80
     pad = max(0, (cols - len(visible)) // 2)
-    return input(" " * pad + prompt)
+    return input(" " * pad + clean_prompt)
 
 def print_banner():
     clear_console()
@@ -928,14 +933,14 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
     with console_lock:
         print()
-        cprint("\033[1;34m╔══════════════════════════════════╗\033[0m")
-        cprint("\033[1;34m║      ✅ ACCOUNT CREATED           ║\033[0m")
-        cprint("\033[1;34m╠══════════════════════════════════╣\033[0m")
-        cprint(f"\033[1;32m║  Name     : {full_name[:22]:<22}\033[1;34m║\033[0m")
-        cprint(f"\033[1;32m║  Email    : {email_or_phone[:22]:<22}\033[1;34m║\033[0m")
-        cprint(f"\033[1;32m║  Password : {used_password[:22]:<22}\033[1;34m║\033[0m")
-        cprint(f"\033[1;32m║  Code     : {(jbkj if jbkj else 'N/A')[:22]:<22}\033[1;34m║\033[0m")
-        cprint("\033[1;34m╚══════════════════════════════════╝\033[0m")
+        cprint("\033[1;34m╔════════════════════════════════════════╗\033[0m")
+        cprint("\033[1;34m║        ✅ ACCOUNT CREATED              ║\033[0m")
+        cprint("\033[1;34m╠════════════════════════════════════════╣\033[0m")
+        cprint(f"\033[1;32m║  Name     : {full_name[:28]:<28}\033[1;34m║\033[0m")
+        cprint(f"\033[1;32m║  Email    : {email_or_phone[:28]:<28}\033[1;34m║\033[0m")
+        cprint(f"\033[1;32m║  Password : {used_password[:28]:<28}\033[1;34m║\033[0m")
+        cprint(f"\033[1;32m║  Code     : {(jbkj if jbkj else 'N/A')[:28]:<28}\033[1;34m║\033[0m")
+        cprint("\033[1;34m╚════════════════════════════════════════╝\033[0m")
         print()
 
     uid        = session.cookies.get("c_user")
@@ -972,7 +977,8 @@ def NEMAIN():
             cprint("\033[1;34m║        ACCOUNT CREATOR           ║\033[0m")
             cprint("\033[1;34m╚══════════════════════════════════╝\033[0m")
 
-            count = int(cinput("\n\033[1;92m➤ How many accounts to create: \033[0m"))
+            print()
+            count = int(cinput("\033[1;92m➤ How many accounts to create: \033[0m"))
 
             if count > 0:
                 break
