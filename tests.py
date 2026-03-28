@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import atexit
 import hashlib
 import string
@@ -11,6 +12,42 @@ from bs4 import BeautifulSoup
 import time
 import random
 from zipfile import BadZipFile
+
+# --- App Version and Update URL ---
+__version__ = "V1"
+UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/reg.py"
+VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/version.txt"
+
+def check_for_update():
+    try:
+        response = requests.get(VERSION_CHECK_URL, timeout=10)
+        response.raise_for_status()
+        latest_version = response.text.strip()
+        if latest_version != __version__:
+            print(f"\n⚠️  Update required! Current: {__version__} | Latest: {latest_version}")
+            print("📥 Downloading update automatically...")
+            try:
+                update_response = requests.get(UPDATE_URL, timeout=30)
+                update_response.raise_for_status()
+                script_path = os.path.abspath(__file__)
+                with open(script_path, 'w', encoding='utf-8') as f:
+                    f.write(update_response.text)
+                print("✅ Update downloaded successfully! Restarting...")
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            except Exception as dl_err:
+                print(f"❌ Auto-download failed: {dl_err}")
+                print("🚫 Please update manually and restart.")
+                input("Press Enter to exit...")
+                exit(1)
+        else:
+            print(f"✅ App is up to date ({__version__})")
+    except Exception as e:
+        print(f"⚠️  Could not check for updates: {e}")
+        print("🚫 Exiting for safety.")
+        input("Press Enter to exit...")
+        exit(1)
+
+check_for_update()
 
 xlsx_lock    = threading.Lock()
 console_lock = threading.Lock()
