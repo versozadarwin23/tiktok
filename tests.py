@@ -63,6 +63,10 @@ def cinput(prompt):
 def print_banner():
     clear_console()
     W = 42
+    print()
+    print()
+    print()
+    print()
     cprint("\033[1;34m" + "═" * W + "\033[0m")
     cprint("\033[1;33m⚡  FB Account Creator  ⚡\033[0m")
     cprint("\033[1;35mDeveloper  : Dars\033[0m")
