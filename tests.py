@@ -14,8 +14,8 @@ import random
 from zipfile import BadZipFile
 
 # --- App Version and Update URL ---
-__version__ = "V2"
-UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/reg.py"
+__version__ = "V1"
+UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tests.py"
 VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/version.txt"
 
 def check_for_update():
