@@ -24,7 +24,7 @@ from zipfile import BadZipFile
 
 # --- App Version and Update URL ---
 
-__version__ = "V2"
+__version__ = "V3"
 
 UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tests.py"
 
@@ -36,88 +36,92 @@ def clear_console():
     except Exception:
         pass
 
+def cprint(text, color=""):
+    """Print text centered on the terminal, stripping ANSI for width calc."""
+    import re
+    ansi_escape = re.compile(r'\033\[[0-9;]*m')
+    visible = ansi_escape.sub('', text)
+    try:
+        cols = os.get_terminal_size().columns
+    except Exception:
+        cols = 80
+    pad = max(0, (cols - len(visible)) // 2)
+    print(" " * pad + text)
+
+def cinput(prompt):
+    """Centered input prompt."""
+    import re
+    ansi_escape = re.compile(r'\033\[[0-9;]*m')
+    visible = ansi_escape.sub('', prompt)
+    try:
+        cols = os.get_terminal_size().columns
+    except Exception:
+        cols = 80
+    pad = max(0, (cols - len(visible)) // 2)
+    return input(" " * pad + prompt)
+
 def print_banner():
     clear_console()
-
-    print("\033[1;34m" + "═" * 42 + "\033[0m")
-    print("\033[1;33m  ⚡ FB Account Creator  ⚡\033[0m")
-    print("\033[1;35m  Developer  : Dars\033[0m")
-    print("\033[1;32m  Version    : " + __version__ + "\033[0m")
-    print("\033[1;34m" + "═" * 42 + "\033[0m\n")
+    W = 42
+    cprint("\033[1;34m" + "═" * W + "\033[0m")
+    cprint("\033[1;33m⚡  FB Account Creator  ⚡\033[0m")
+    cprint("\033[1;35mDeveloper  : Dars\033[0m")
+    cprint("\033[1;32mVersion    : " + __version__ + "\033[0m")
+    cprint("\033[1;34m" + "═" * W + "\033[0m")
+    print()
 
 def check_for_update():
-
     print_banner()
-    print("\033[96m  🔄 Checking for updates...\033[0m")
+    cprint("\033[96m🔄 Checking for updates...\033[0m")
 
     try:
-
         response = requests.get(VERSION_CHECK_URL, timeout=5)
-
         response.raise_for_status()
-
         remote_version = response.text.strip()
 
         if remote_version != __version__:
-
-            print(f"\n\033[1;93m  ╔══════════════════════════════════╗\033[0m")
-            print(f"\033[1;93m  ║       UPDATE AVAILABLE!          ║\033[0m")
-            print(f"\033[1;93m  ╚══════════════════════════════════╝\033[0m")
-            print(f"\033[91m  Current : v{__version__}\033[0m")
-            print(f"\033[92m  Latest  : v{remote_version}\033[0m\n")
+            print()
+            cprint("\033[1;93m╔══════════════════════════════════╗\033[0m")
+            cprint("\033[1;93m║       UPDATE AVAILABLE!          ║\033[0m")
+            cprint("\033[1;93m╚══════════════════════════════════╝\033[0m")
+            cprint(f"\033[91mCurrent : v{__version__}\033[0m")
+            cprint(f"\033[92mLatest  : v{remote_version}\033[0m")
+            print()
 
             while True:
-
-                choice = input("\033[93m  Update now? (y/n): \033[0m").strip().lower()
+                choice = cinput("\033[93mUpdate now? (y/n): \033[0m").strip().lower()
 
                 if choice == 'y':
-
-                    print("\033[96m  ⬇️  Downloading update...\033[0m")
-
+                    cprint("\033[96m⬇️  Downloading update...\033[0m")
                     new_script_response = requests.get(UPDATE_URL, timeout=10)
-
                     new_script_response.raise_for_status()
-
                     current_script_name = sys.argv[0]
-
                     with open(current_script_name, 'w', encoding='utf-8') as f:
-
                         f.write(new_script_response.text)
-
-                    print("\033[92m  ✅ Update successful! Please restart.\033[0m")
-
+                    cprint("\033[92m✅ Update successful! Please restart.\033[0m")
                     sys.exit()
 
                 elif choice == 'n':
-
-                    print("\033[91m  ❌ Update declined. Exiting...\033[0m")
-
+                    cprint("\033[91m❌ Update declined. Exiting...\033[0m")
                     sys.exit()
 
                 else:
-
-                    print("\033[91m  ⚠️  Type 'y' or 'n'.\033[0m")
+                    cprint("\033[91m⚠️  Type 'y' or 'n'.\033[0m")
 
         else:
-
-            print(f"\033[92m  ✅ You're on the latest version (v{__version__}).\033[0m")
-
+            cprint(f"\033[92m✅ You're on the latest version ({__version__}).\033[0m")
             time.sleep(2)
 
     except requests.exceptions.RequestException as e:
-
-        print(f"\n\033[91m  ❌ Update check failed: {e}\033[0m")
-
-        print("\033[93m  ⚠️  Continuing with current version...\033[0m")
-
+        print()
+        cprint(f"\033[91m❌ Update check failed: {e}\033[0m")
+        cprint("\033[93m⚠️  Continuing with current version...\033[0m")
         time.sleep(2)
 
     except Exception as e:
-
-        print(f"\n\033[91m  ❌ Unexpected error: {e}\033[0m")
-
-        print("\033[93m  ⚠️  Continuing with current version...\033[0m")
-
+        print()
+        cprint(f"\033[91m❌ Unexpected error: {e}\033[0m")
+        cprint("\033[93m⚠️  Continuing with current version...\033[0m")
         time.sleep(2)
 
 check_for_update()
@@ -172,7 +176,7 @@ def generate_email():
 
             with console_lock:
 
-                print(f"\033[91m⚠️ generate_email attempt {attempt+1} failed: {e}\033[0m")
+                cprint(f"\033[91m⚠️ generate_email attempt {attempt+1} failed: {e}\033[0m")
 
         time.sleep(2)
 
@@ -252,7 +256,7 @@ def check_inbox_for_code(email, max_wait=120, poll_interval=5):
 
             with console_lock:
 
-                print(f"\033[91m⚠️ inbox poll error: {e}\033[0m")
+                cprint(f"\033[91m⚠️ inbox poll error: {e}\033[0m")
 
         time.sleep(poll_interval)
 
@@ -634,7 +638,7 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
     with console_lock:
 
-        print(f"\033[94m  📧 Temp email: {email_address}\033[0m")
+        cprint(f"\033[94m📧 Temp email: {email_address}\033[0m")
 
     agent = random.choice(ua)
 
@@ -714,13 +718,13 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
             with console_lock:
 
-                print("\033[91m😢 Registration form not found. Retrying...\033[0m")
+                cprint("\033[91m😢 Registration form not found. Retrying...\033[0m")
 
         except requests.exceptions.RequestException as e:
 
             with console_lock:
 
-                print(f"\033[91m😢 Network error getting form: {e}. Retrying...\033[0m")
+                cprint(f"\033[91m😢 Network error getting form: {e}. Retrying...\033[0m")
 
         time.sleep(3)
 
@@ -733,27 +737,24 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
     if global_reg_choice is None:
 
         while True:
+            print()
+            cprint("\033[1;34m╔══════════════════════════════════╗\033[0m")
+            cprint("\033[1;34m║     REGISTRATION METHOD          ║\033[0m")
+            cprint("\033[1;34m╠══════════════════════════════════╣\033[0m")
+            cprint("\033[1;34m║  \033[1;32m[1]\033[0m Email Registration          \033[1;34m║\033[0m")
+            cprint("\033[1;34m║  \033[1;32m[2]\033[0m Phone Number Registration   \033[1;34m║\033[0m")
+            cprint("\033[1;34m╚══════════════════════════════════╝\033[0m")
 
-            print("\n\033[1;34m  ╔══════════════════════════════════╗\033[0m")
-            print("\033[1;34m  ║     REGISTRATION METHOD          ║\033[0m")
-            print("\033[1;34m  ╠══════════════════════════════════╣\033[0m")
-            print("\033[1;34m  ║  \033[1;32m[1]\033[0m Email Registration          \033[1;34m║\033[0m")
-            print("\033[1;34m  ║  \033[1;32m[2]\033[0m Phone Number Registration   \033[1;34m║\033[0m")
-            print("\033[1;34m  ╚══════════════════════════════════╝\033[0m")
-
-            choice = input("\n\033[1;92m  ➤ Your choice (1 or 2): \033[0m").strip()
+            choice = cinput("\n\033[1;92m➤ Your choice (1 or 2): \033[0m").strip()
 
             clear_console()
 
             if choice in ['1', '2']:
-
                 global_reg_choice = choice
-
                 save_user_choice("reg_choice", choice)
-
                 break
 
-            print("\033[91m  ❌ Invalid choice. Enter 1 or 2.\033[0m")
+            cprint("\033[91m❌ Invalid choice. Enter 1 or 2.\033[0m")
 
     else:
 
@@ -764,10 +765,8 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
     email_or_phone   = phone_number if is_phone_choice else email_address
 
     if is_phone_choice:
-
         with console_lock:
-
-            print(f"\033[92m  📱 Using phone: {email_or_phone}\033[0m")
+            cprint(f"\033[92m📱 Using phone: {email_or_phone}\033[0m")
 
     # ── Submit registration ─────────────────────────────────
 
@@ -817,7 +816,7 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
             with console_lock:
 
-                print(f"\033[91m😢 Registration post failed: {e}. Retrying...\033[0m")
+                cprint(f"\033[91m😢 Registration post failed: {e}. Retrying...\033[0m")
 
             time.sleep(3)
 
@@ -826,30 +825,24 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
         return "FAILED_REGISTRATION"
 
     if "c_user" not in session.cookies:
-
         with console_lock:
-
-            print("\033[91m⚠️ No c_user cookie. Account creation failed.\033[0m")
-
+            cprint("\033[91m⚠️ No c_user cookie. Account creation failed.\033[0m")
         time.sleep(3)
-
         return "FAILED_NO_C_USER"
 
     # ── Wait for confirmation code via YOUR TempMail API ────
 
     with console_lock:
 
-        print(f"\033[93m  ⏳ Waiting for confirmation code at {email_address}...\033[0m")
+        cprint(f"\033[93m⏳ Waiting for confirmation code at {email_address}...\033[0m")
 
     jbkj = check_inbox_for_code(email_address, max_wait=120, poll_interval=5)
 
     # ── If registered with phone, change to email ───────────
 
     if is_phone_choice:
-
         with console_lock:
-
-            print("\033[93mChanging account email from phone...\033[0m")
+            cprint("\033[93mChanging account email from phone...\033[0m")
 
         change_email_url = "https://m.facebook.com/changeemail/"
 
@@ -873,7 +866,7 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
                 with console_lock:
 
-                    print(f"\033[91m❌ Error getting email change form: {e}\033[0m")
+                    cprint(f"\033[91m❌ Error getting email change form: {e}\033[0m")
 
             time.sleep(2)
 
@@ -902,11 +895,8 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
                     cr.raise_for_status()
 
                     if "email" in cr.text.lower():
-
                         with console_lock:
-
-                            print(f"\033[92m✅ Email changed to {email_address}\033[0m")
-
+                            cprint(f"\033[92m✅ Email changed to {email_address}\033[0m")
                         email_or_phone = email_address
 
                     break
@@ -915,18 +905,15 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
                     with console_lock:
 
-                        print(f"\033[91m❌ Email change post failed: {e}\033[0m")
+                        cprint(f"\033[91m❌ Email change post failed: {e}\033[0m")
 
                     time.sleep(3)
 
         # Re-check inbox after email change
 
         if not jbkj:
-
             with console_lock:
-
-                print(f"\033[93m⏳ Re-checking inbox after email change...\033[0m")
-
+                cprint(f"\033[93m⏳ Re-checking inbox after email change...\033[0m")
             jbkj = check_inbox_for_code(email_address, max_wait=120, poll_interval=5)
 
     # ── Print result ────────────────────────────────────────
@@ -934,15 +921,16 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
     full_name = f"{firstname} {lastname}"
 
     with console_lock:
-
-        print("\n\033[1;34m  ╔══════════════════════════════════╗\033[0m")
-        print("\033[1;34m  ║      ✅ ACCOUNT CREATED           ║\033[0m")
-        print("\033[1;34m  ╠══════════════════════════════════╣\033[0m")
-        print(f"\033[1;32m  ║  Name     : {full_name[:22]:<22}\033[1;34m║\033[0m")
-        print(f"\033[1;32m  ║  Email    : {email_or_phone[:22]:<22}\033[1;34m║\033[0m")
-        print(f"\033[1;32m  ║  Password : {used_password[:22]:<22}\033[1;34m║\033[0m")
-        print(f"\033[1;32m  ║  Code     : {(jbkj if jbkj else 'N/A')[:22]:<22}\033[1;34m║\033[0m")
-        print("\033[1;34m  ╚══════════════════════════════════╝\033[0m\n")
+        print()
+        cprint("\033[1;34m╔══════════════════════════════════╗\033[0m")
+        cprint("\033[1;34m║      ✅ ACCOUNT CREATED           ║\033[0m")
+        cprint("\033[1;34m╠══════════════════════════════════╣\033[0m")
+        cprint(f"\033[1;32m║  Name     : {full_name[:22]:<22}\033[1;34m║\033[0m")
+        cprint(f"\033[1;32m║  Email    : {email_or_phone[:22]:<22}\033[1;34m║\033[0m")
+        cprint(f"\033[1;32m║  Password : {used_password[:22]:<22}\033[1;34m║\033[0m")
+        cprint(f"\033[1;32m║  Code     : {(jbkj if jbkj else 'N/A')[:22]:<22}\033[1;34m║\033[0m")
+        cprint("\033[1;34m╚══════════════════════════════════╝\033[0m")
+        print()
 
     uid        = session.cookies.get("c_user")
 
@@ -954,17 +942,13 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
     if not has_access_token_in_xlsx(filename_xlsx, email_or_phone):
 
-        save_choice = input("\033[1;93m  💾 Save this account? (y/n): \033[0m").strip().lower() or "y"
+        save_choice = cinput("\033[1;93m💾 Save this account? (y/n): \033[0m").strip().lower() or "y"
 
         if save_choice == "y":
-
             save_to_xlsx(filename_xlsx, [full_name, email_or_phone, used_password, profile_id, ""])
-
             save_to_txt(filename_txt,   [full_name, email_or_phone, used_password, profile_id, ""])
-
             with console_lock:
-
-                print(f"\033[1;32m  ✅ Saved: {full_name}\033[0m")
+                cprint(f"\033[1;32m✅ Saved: {full_name}\033[0m")
 
 # ─────────────────────────────────────────────────────────────
 
@@ -977,31 +961,25 @@ def NEMAIN():
     print_banner()
 
     while True:
-
         try:
+            cprint("\033[1;34m╔══════════════════════════════════╗\033[0m")
+            cprint("\033[1;34m║        ACCOUNT CREATOR           ║\033[0m")
+            cprint("\033[1;34m╚══════════════════════════════════╝\033[0m")
 
-            print("\033[1;34m  ╔══════════════════════════════════╗\033[0m")
-            print("\033[1;34m  ║        ACCOUNT CREATOR           ║\033[0m")
-            print("\033[1;34m  ╚══════════════════════════════════╝\033[0m")
-
-            count = int(input("\n\033[1;92m  ➤ How many accounts to create: \033[0m"))
+            count = int(cinput("\n\033[1;92m➤ How many accounts to create: \033[0m"))
 
             if count > 0:
-
                 break
 
-            print("\033[91m  ❌ Enter a positive number.\033[0m")
+            cprint("\033[91m❌ Enter a positive number.\033[0m")
 
         except ValueError:
-
-            print("\033[91m  ❌ Invalid input. Numbers only.\033[0m")
+            cprint("\033[91m❌ Invalid input. Numbers only.\033[0m")
 
     global custom_password_base
 
     if custom_password_base is None:
-
-        inp = input("\033[1;93m  ➤ Custom password base (blank = default): \033[0m").strip()
-
+        inp = cinput("\033[1;93m➤ Custom password base (blank = default): \033[0m").strip()
         custom_password_base = inp if inp else "Promises@"
 
     for _ in range(count):
