@@ -54,7 +54,7 @@ from zipfile import BadZipFile
 
 
 
-__version__ = "V2"
+__version__ = "2"
 
 
 
