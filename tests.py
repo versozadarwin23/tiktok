@@ -2,10 +2,8 @@ import json
 import os
 import sys
 import atexit
-import hashlib
 import string
 import threading
-from requests.utils import dict_from_cookiejar
 from openpyxl import Workbook, load_workbook
 import requests
 from bs4 import BeautifulSoup
@@ -57,7 +55,6 @@ console_lock = threading.Lock()
 FAILURE  = "❌"
 MAX_RETRIES = 3
 
-COOKIE_DIR  = "/storage/emulated/0/cookie"
 CONFIG_FILE = "settings.json"
 
 # ─────────────────────────────────────────────────────────────
@@ -354,31 +351,6 @@ def generate_user_details(account_type, gender, password=None):
 
 
 # ─────────────────────────────────────────────────────────────
-# COOKIE HELPERS
-# ─────────────────────────────────────────────────────────────
-def ensure_cookie_dir():
-    if not os.path.exists(COOKIE_DIR):
-        os.makedirs(COOKIE_DIR)
-
-
-def save_cookie_json(cookie_dict):
-    ensure_cookie_dir()
-    c_user = cookie_dict.get("c_user")
-    if not c_user:
-        return
-    file_path = os.path.join(COOKIE_DIR, f"{c_user}.json")
-    try:
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(cookie_dict, f, indent=2)
-    except Exception as e:
-        print(f"❌ Failed to save cookie: {e}")
-
-
-def save_session_cookie(session):
-    save_cookie_json(dict_from_cookiejar(session.cookies))
-
-
-# ─────────────────────────────────────────────────────────────
 # GLOBALS
 # ─────────────────────────────────────────────────────────────
 custom_password_base = None
@@ -580,55 +552,10 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
     if not has_access_token_in_xlsx(filename_xlsx, email_or_phone):
         save_choice = input("💾 Save this account? (y/n): ").strip().lower() or "y"
         if save_choice == "y":
-            while True:
-                with console_lock:
-                    print("🔄 Getting access token...")
-                api_key = "882a8490361da98702bf97a021ddc14d"
-                secret  = "62f8ce9f74b12f84c123cc23437a4a32"
-                params  = {
-                    "api_key": api_key, "email": uid, "format": "JSON",
-                    "generate_session_cookies": 1, "locale": "en_US",
-                    "method": "auth.login", "password": used_password,
-                    "return_ssl_resources": 1, "v": "1.0",
-                }
-                sig_str       = "".join(f"{k}={params[k]}" for k in sorted(params)) + secret
-                params["sig"] = hashlib.md5(sig_str.encode()).hexdigest()
-
-                access_token = ""
-                try:
-                    resp = requests.get(
-                        "https://api.facebook.com/restserver.php",
-                        params=params, headers=headers, timeout=60
-                    )
-                    resp.raise_for_status()
-                    data_api     = resp.json()
-                    access_token = data_api.get("access_token", "")
-                    if "error_title" in data_api:
-                        with console_lock:
-                            print(data_api["error_title"])
-                except Exception as e:
-                    with console_lock:
-                        print(f"❌ Access token error: {e}")
-
-                if access_token.strip():
-                    with console_lock:
-                        print("✅ Access token acquired.")
-                    save_to_xlsx(filename_xlsx, [full_name, email_or_phone, used_password, profile_id, access_token])
-                    save_to_txt(filename_txt,   [full_name, email_or_phone, used_password, profile_id, access_token])
-                    cookie_names  = ["c_user", "datr", "fr", "noscript", "sb", "xs"]
-                    save_cookie_json({n: session.cookies.get(n, "") for n in cookie_names})
-                    with console_lock:
-                        print(f"✅ Saved | {full_name}")
-                    break
-                else:
-                    with console_lock:
-                        print("❌ No access token.")
-                    am = input("✈️ Toggle airplane mode then press Enter (or 'n' to skip): ").strip().lower()
-                    if am == "n":
-                        break
-                    cookie_names = ["c_user", "datr", "fr", "noscript", "sb", "xs"]
-                    save_cookie_json({n: session.cookies.get(n, "") for n in cookie_names})
-                    input("Press Enter after toggling airplane mode...")
+            save_to_xlsx(filename_xlsx, [full_name, email_or_phone, used_password, profile_id, ""])
+            save_to_txt(filename_txt,   [full_name, email_or_phone, used_password, profile_id, ""])
+            with console_lock:
+                print(f"✅ Saved | {full_name}")
 
 
 # ─────────────────────────────────────────────────────────────
