@@ -24,7 +24,7 @@ from zipfile import BadZipFile
 
 # --- App Version and Update URL ---
 
-__version__ = "V3"
+__version__ = "V4"
 
 UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tests.py"
 
@@ -173,6 +173,12 @@ def generate_email():
             if data.get("success") and data.get("email"):
 
                 email = data["email"]
+
+                # Fix incomplete email domain (e.g. "user@signlang." missing "oo.gd")
+                if email.endswith("@signlang.") or (email.count(".") == 0 and "@" in email):
+                    email = email.rstrip(".") + ".oo.gd"
+                elif "@" in email and not email.split("@")[1].count("."):
+                    email = email + ".oo.gd"
 
                 return email, email   # (email_address, inbox_ref)
 
@@ -835,10 +841,6 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
         return "FAILED_NO_C_USER"
 
     # ── Wait for confirmation code via YOUR TempMail API ────
-
-    with console_lock:
-
-        cprint(f"\033[93m⏳ Waiting for confirmation code at {email_address}...\033[0m")
 
     jbkj = check_inbox_for_code(email_address, max_wait=120, poll_interval=5)
 
