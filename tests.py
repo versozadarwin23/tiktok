@@ -14,7 +14,7 @@ import random
 from zipfile import BadZipFile
 
 # --- App Version and Update URL ---
-__version__ = "V1"
+__version__ = "V2"
 UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tests.py"
 VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/version.txt"
 
@@ -33,7 +33,9 @@ def check_for_update():
                 with open(script_path, 'w', encoding='utf-8') as f:
                     f.write(update_response.text)
                 print("✅ Update downloaded successfully! Restarting...")
-                os.execv(sys.executable, [sys.executable] + sys.argv)
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                os.chdir(script_dir)
+                os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)])
             except Exception as dl_err:
                 print(f"❌ Auto-download failed: {dl_err}")
                 print("🚫 Please update manually and restart.")
