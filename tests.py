@@ -84,8 +84,8 @@ def check_for_update():
             cprint("\033[1;93m╔══════════════════════════════════╗\033[0m")
             cprint("\033[1;93m║       UPDATE AVAILABLE!          ║\033[0m")
             cprint("\033[1;93m╚══════════════════════════════════╝\033[0m")
-            cprint(f"\033[91mCurrent : v{__version__}\033[0m")
-            cprint(f"\033[92mLatest  : v{remote_version}\033[0m")
+            cprint(f"\033[91mCurrent : {__version__}\033[0m")
+            cprint(f"\033[92mLatest  : {remote_version}\033[0m")
             print()
 
             while True:
