@@ -71,47 +71,122 @@ VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/re
 
 
 def check_for_update():
-    print("\033[96mChecking for updates...\033[0m")
+
+
+
     try:
-        response = requests.get(VERSION_CHECK_URL, timeout=5)
+
+
+
+        response = requests.get(VERSION_CHECK_URL, timeout=10)
+
+
+
         response.raise_for_status()
-        remote_version = response.text.strip()
 
-        if remote_version != __version__:
-            print(f"\n\033[93mUPDATE AVAILABLE!\033[0m")
-            print(f"You have version: \033[91m{__version__}\033[0m")
-            print(f"Latest version is: \033[92m{remote_version}\033[0m")
 
-            while True:
-                choice = input("\033[93mDo you want to update? (y/n): \033[0m").strip().lower()
-                if choice == 'y':
-                    print("\033[96mDownloading update...\033[0m")
-                    new_script_response = requests.get(UPDATE_URL, timeout=10)
-                    new_script_response.raise_for_status()
-                    current_script_name = sys.argv[0]
-                    print(f"\033[96mOverwriting {current_script_name} with the new version...\033[0m")
-                    with open(current_script_name, 'w', encoding='utf-8') as f:
-                        f.write(new_script_response.text)
-                    print("\033[92mUpdate successful!\033[0m")
-                    print("\033[92mPlease restart the script to use the new version.\033[0m")
-                    sys.exit()
-                elif choice == 'n':
-                    print("\033[91mUpdate declined. Exiting program.\033[0m")
-                    sys.exit()
-                else:
-                    print("\033[91mInvalid choice. Please type 'y' for yes or 'n' for no.\033[0m")
+
+        latest_version = response.text.strip()
+
+
+
+        if latest_version != __version__:
+
+
+
+            print(f"\n⚠️  Update required! Current: {__version__} | Latest: {latest_version}")
+
+
+
+            print("📥 Downloading update automatically...")
+
+
+
+            try:
+
+
+
+                update_response = requests.get(UPDATE_URL, timeout=30)
+
+
+
+                update_response.raise_for_status()
+
+
+
+                script_path = os.path.abspath(__file__)
+
+
+
+                with open(script_path, 'w', encoding='utf-8') as f:
+
+
+
+                    f.write(update_response.text)
+
+
+
+                print("✅ Update downloaded successfully! Restarting...")
+
+
+
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+
+                os.chdir(script_dir)
+
+
+
+                os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)])
+
+
+
+            except Exception as dl_err:
+
+
+
+                print(f"❌ Auto-download failed: {dl_err}")
+
+
+
+                print("🚫 Please update manually and restart.")
+
+
+
+                input("Press Enter to exit...")
+
+
+
+                exit(1)
+
+
+
         else:
-            print(f"\033[92mYou are running the latest version ({__version__}).\033[0m")
-            time.sleep(2)
 
-    except requests.exceptions.RequestException as e:
-        print(f"\n\033[91m❌ Error checking for updates: {e}\033[0m")
-        print("\033[93mContinuing with the current version...\033[0m")
-        time.sleep(2)
+
+
+            print(f"✅ App is up to date ({__version__})")
+
+
+
     except Exception as e:
-        print(f"\n\033[91m❌ An unexpected error occurred during update check: {e}\033[0m")
-        print("\033[93mContinuing with the current version...\033[0m")
-        time.sleep(2)
+
+
+
+        print(f"⚠️  Could not check for updates: {e}")
+
+
+
+        print("🚫 Exiting for safety.")
+
+
+
+        input("Press Enter to exit...")
+
+
+
+        exit(1)
 
 
 
