@@ -24,7 +24,7 @@ from zipfile import BadZipFile
 
 # --- App Version and Update URL ---
 
-__version__ = "V5"
+__version__ = "V6"
 
 UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tests.py"
 
@@ -394,23 +394,7 @@ def random_fingerprint():
     return random.choice(fingerprints)
 
 ua = [
-
-    "Mozilla/5.0 (Linux; Android 10; SM-G960U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/300.0.0.0.0;]",
-
-    "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/301.0.0.0.0;]",
-
-    "Mozilla/5.0 (Linux; Android 12; SM-A525F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]",
-
-    "Mozilla/5.0 (Linux; Android 11; Redmi Note 9S) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/301.0.0.0.0;]",
-
-    "Mozilla/5.0 (Linux; Android 12; OnePlus 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]",
-
-    "Mozilla/5.0 (Linux; Android 12; Samsung SM-S901U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]",
-
-    "Mozilla/5.0 (Linux; Android 11; Google Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/301.0.0.0.0;]",
-
-    "Mozilla/5.0 (Linux; Android 12; Xiaomi 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]",
-
+    "Mozilla/5.0 (Linux; Android 11; vivo Y11 Build/PKQ1.190616.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]"
 ]
 
 # ─────────────────────────────────────────────────────────────
@@ -669,44 +653,25 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
     firstname, lastname, date, year, month, phone_number, used_password = generate_user_details(account_type, gender, password)
 
-    url     = "https://m.facebook.com/reg"
-
+    url = "https://m.facebook.com/reg"
     headers = {
-
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-
         "Referer": "https://m.facebook.com/reg",
-
         "Connection": "keep-alive",
-
         "Accept-Language": "en-US,en;q=0.9",
-
         "X-FB-Connection-Type": "mobile.LTE",
-
         "X-FB-Device": random_device_model(),
-
         "X-FB-Device-ID": random_device_id(),
-
         "X-FB-Fingerprint": random_fingerprint(),
-
         "X-FB-Connection-Quality": "EXCELLENT",
-
         "X-FB-Net-HNI": "51502",
-
         "X-FB-SIM-HNI": "51502",
-
         "X-FB-HTTP-Engine": "Liger",
-
         "x-fb-connection-type": "Unknown",
-
         "accept-encoding": "gzip, deflate",
-
         "content-type": "application/x-www-form-urlencoded",
-
-        "x-fb-http-engine": "Liger",
-
+        # "x-fb-http-engine": "Liger",
         "User-Agent": agent,
-
     }
 
     if session is None:
