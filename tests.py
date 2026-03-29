@@ -24,11 +24,64 @@ from zipfile import BadZipFile
 
 # --- App Version and Update URL ---
 
-__version__ = "V6"
+__version__ = "V7"
 
 UPDATE_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/tests.py"
 
 VERSION_CHECK_URL = "https://raw.githubusercontent.com/versozadarwin23/tiktok/refs/heads/main/version.txt"
+
+ua = [
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921445772;FBDM/{density=4.0,width=1440,height=3120};FBLC/en_US;FBRV/0;FBCR/Verizon;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921882103;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_GB;FBRV/0;FBCR/Vodafone;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905331224;FBDM/{density=3.5,width=1440,height=3120};FBLC/id_ID;FBRV/0;FBCR/Telkomsel;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921334551;FBDM/{density=4.0,width=1440,height=3120};FBLC/pt_BR;FBRV/0;FBCR/Vivo;FBMF/Oppo;FBBD/oppo;FBPN/com.facebook.katana;FBDV/CPH2841;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/578.0.0.35.102;FBBV/892110447;FBDM/{density=3.0,width=1080,height=2400};FBLC/vi_VN;FBRV/0;FBCR/Viettel;FBMF/Vivo;FBBD/vivo;FBPN/com.facebook.katana;FBDV/V2502A;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921990123;FBDM/{density=3.0,width=1080,height=2340};FBLC/es_ES;FBRV/0;FBCR/Movistar;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S942B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912556778;FBDM/{density=3.5,width=1080,height=2400};FBLC/fr_FR;FBRV/0;FBCR/Orange;FBMF/Realme;FBBD/realme;FBPN/com.facebook.katana;FBDV/RMX3851;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921667112;FBDM/{density=4.0,width=1440,height=3200};FBLC/en_US;FBRV/0;FBCR/AT&T;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905778223;FBDM/{density=3.0,width=1080,height=2400};FBLC/tr_TR;FBRV/0;FBCR/Turkcell;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921443119;FBDM/{density=3.5,width=1440,height=3120};FBLC/de_DE;FBRV/0;FBCR/Telekom;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921102938;FBDM/{density=4.0,width=1440,height=3120};FBLC/en_PH;FBRV/0;FBCR/Globe;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912883471;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_AU;FBRV/0;FBCR/Telstra;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921556002;FBDM/{density=3.5,width=1440,height=3120};FBLC/en_CA;FBRV/0;FBCR/Rogers;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905991234;FBDM/{density=4.0,width=1440,height=3120};FBLC/pt_PT;FBRV/0;FBCR/MEO;FBMF/Oppo;FBBD/oppo;FBPN/com.facebook.katana;FBDV/CPH2841;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921778339;FBDM/{density=3.0,width=1080,height=2400};FBLC/it_IT;FBRV/0;FBCR/TIM;FBMF/Vivo;FBBD/vivo;FBPN/com.facebook.katana;FBDV/V2502A;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/578.0.0.35.102;FBBV/892445110;FBDM/{density=3.0,width=1080,height=2340};FBLC/en_MY;FBRV/0;FBCR/Maxis;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S942B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921221556;FBDM/{density=3.5,width=1080,height=2400};FBLC/en_ZA;FBRV/0;FBCR/MTN;FBMF/Realme;FBBD/realme;FBPN/com.facebook.katana;FBDV/RMX3851;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912334889;FBDM/{density=4.0,width=1440,height=3200};FBLC/nl_NL;FBRV/0;FBCR/KPN;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921445221;FBDM/{density=3.0,width=1080,height=2400};FBLC/pl_PL;FBRV/0;FBCR/Play;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905112667;FBDM/{density=3.5,width=1440,height=3120};FBLC/en_IE;FBRV/0;FBCR/Three;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921889443;FBDM/{density=4.0,width=1440,height=3120};FBLC/en_SG;FBRV/0;FBCR/Singtel;FBMF/Oppo;FBBD/oppo;FBPN/com.facebook.katana;FBDV/CPH2841;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/578.0.0.35.102;FBBV/892776332;FBDM/{density=3.0,width=1080,height=2400};FBLC/ar_SA;FBRV/0;FBCR/STC;FBMF/Vivo;FBBD/vivo;FBPN/com.facebook.katana;FBDV/V2502A;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921331009;FBDM/{density=3.0,width=1080,height=2340};FBLC/en_NZ;FBRV/0;FBCR/Spark;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S942B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912554221;FBDM/{density=3.5,width=1080,height=2400};FBLC/ja_JP;FBRV/0;FBCR/Docomo;FBMF/Realme;FBBD/realme;FBPN/com.facebook.katana;FBDV/RMX3851;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921669887;FBDM/{density=4.0,width=1440,height=3200};FBLC/ko_KR;FBRV/0;FBCR/SKT;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905330112;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_HK;FBRV/0;FBCR/CSL;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921448554;FBDM/{density=3.5,width=1440,height=3120};FBLC/en_AE;FBRV/0;FBCR/Etisalat;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912771003;FBDM/{density=4.0,width=1440,height=3120};FBLC/en_IL;FBRV/0;FBCR/Cellcom;FBMF/Oppo;FBBD/oppo;FBPN/com.facebook.katana;FBDV/CPH2841;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921992445;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_PK;FBRV/0;FBCR/Jazz;FBMF/Vivo;FBBD/vivo;FBPN/com.facebook.katana;FBDV/V2502A;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905118776;FBDM/{density=3.0,width=1080,height=2340};FBLC/en_NG;FBRV/0;FBCR/MTN;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S942B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921114002;FBDM/{density=3.5,width=1080,height=2400};FBLC/en_KE;FBRV/0;FBCR/Safaricom;FBMF/Realme;FBBD/realme;FBPN/com.facebook.katana;FBDV/RMX3851;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/578.0.0.35.102;FBBV/892885441;FBDM/{density=4.0,width=1440,height=3200};FBLC/en_GH;FBRV/0;FBCR/AirtelTigo;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921332998;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_BD;FBRV/0;FBCR/Grameenphone;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912441007;FBDM/{density=3.5,width=1440,height=3120};FBLC/en_LK;FBRV/0;FBCR/Dialog;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921553112;FBDM/{density=4.0,width=1440,height=3120};FBLC/en_QA;FBRV/0;FBCR/Ooredoo;FBMF/Oppo;FBBD/oppo;FBPN/com.facebook.katana;FBDV/CPH2841;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905770443;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_KW;FBRV/0;FBCR/Zain;FBMF/Vivo;FBBD/vivo;FBPN/com.facebook.katana;FBDV/V2502A;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921882110;FBDM/{density=3.0,width=1080,height=2340};FBLC/en_OM;FBRV/0;FBCR/Omantel;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S942B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912115667;FBDM/{density=3.5,width=1080,height=2400};FBLC/en_JO;FBRV/0;FBCR/Umniah;FBMF/Realme;FBBD/realme;FBPN/com.facebook.katana;FBDV/RMX3851;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921338779;FBDM/{density=4.0,width=1440,height=3200};FBLC/en_EG;FBRV/0;FBCR/Vodafone;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905441332;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_MA;FBRV/0;FBCR/MarocTelecom;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921663001;FBDM/{density=3.5,width=1440,height=3120};FBLC/en_DZ;FBRV/0;FBCR/Mobilis;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912998445;FBDM/{density=4.0,width=1440,height=3120};FBLC/en_TN;FBRV/0;FBCR/Ooredoo;FBMF/Oppo;FBBD/oppo;FBPN/com.facebook.katana;FBDV/CPH2841;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921112338;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_LB;FBRV/0;FBCR/Touch;FBMF/Vivo;FBBD/vivo;FBPN/com.facebook.katana;FBDV/V2502A;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905335110;FBDM/{density=3.0,width=1080,height=2340};FBLC/en_ET;FBRV/0;FBCR/EthioTelecom;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S942B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921557889;FBDM/{density=3.5,width=1080,height=2400};FBLC/en_UG;FBRV/0;FBCR/Airtel;FBMF/Realme;FBBD/realme;FBPN/com.facebook.katana;FBDV/RMX3851;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912224003;FBDM/{density=4.0,width=1440,height=3200};FBLC/en_TZ;FBRV/0;FBCR/Vodacom;FBMF/Samsung;FBBD/samsung;FBPN/com.facebook.katana;FBDV/SM-S948B;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921880112;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_ZM;FBRV/0;FBCR/Zamtel;FBMF/Xiaomi;FBBD/xiaomi;FBPN/com.facebook.katana;FBDV/25113PN0EG;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/580.1.0.44.110;FBBV/905448997;FBDM/{density=3.5,width=1440,height=3120};FBLC/en_ZW;FBRV/0;FBCR/Econet;FBMF/Google;FBBD/google;FBPN/com.facebook.katana;FBDV/Pixel 10 Pro;FBSV/16;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/585.0.0.52.118;FBBV/921116445;FBDM/{density=4.0,width=1440,height=3120};FBLC/en_BW;FBRV/0;FBCR/Mascom;FBMF/Oppo;FBBD/oppo;FBPN/com.facebook.katana;FBDV/CPH2841;FBSV/15;FBOP/1;FBCA/arm64-v8a;]",
+  "[FBAN/FB4A;FBAV/582.0.0.48.115;FBBV/912663110;FBDM/{density=3.0,width=1080,height=2400};FBLC/en_NA;FBRV/0;FBCR/MTC;FBMF/Vivo;FBBD/vivo;FBPN/com.facebook.katana;FBDV/V2502A;FBSV/15;FBOP/1;FBCA/arm64-v8a;]"
+]
 
 def clear_console():
     try:
@@ -393,47 +446,6 @@ def random_fingerprint():
 
     return random.choice(fingerprints)
 
-ua = [
-"Mozilla/5.0 (Linux; Android 12; SM-G998B Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.144 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/450.0.0.10.105;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 11; vivo Y11 Build/PKQ1.190616.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/118.0.5993.80 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 13; POCO X3 Pro Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.90 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/520.0.0.15.115;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 14; CPH2371 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.60 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/510.0.0.10.110;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 10; Redmi Note 10 Build/RKQ1.200826.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/420.0.0.11.120;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 12; RMX3363 Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/121.0.6167.164 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 13; SM-A536B Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/480.0.0.12.100;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 11; vivo V2027 Build/RP1A.200720.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/119.0.6045.163 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/450.0.0.10.105;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 14; SM-S908B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.60 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/530.0.0.11.120;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 10; CPH2185 Build/QKQ1.200209.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/118.0.5993.80 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/400.0.0.9.110;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 12; Pixel 6 Build/SQ3A.220705.004; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.90 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 13; vivo Y21 Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/123.0.6312.40 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/520.0.0.15.115;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 11; SM-A525F Build/RP1A.200720.012; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.144 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/450.0.0.10.105;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 14; POCO X4 Pro Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/530.0.0.11.120;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 12; RMX3241 Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/121.0.6167.164 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 10; vivo Y11 Build/PKQ1.190616.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/115.0.5790.166 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/420.0.0.11.120;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 13; CPH2211 Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.60 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/510.0.0.10.110;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 11; M2102J20SG Build/RKQ1.200826.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/119.0.6045.163 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/480.0.0.12.100;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/UQ1A.240205.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/520.0.0.15.115;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 12; vivo V2111 Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.90 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 11; CPH2371 Build/RP1A.200720.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/118.0.5993.80 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 14; SM-A536B Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/530.0.0.11.120;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 10; RMX3085 Build/QKQ1.200209.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/119.0.6045.163 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/420.0.0.11.120;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 12; Redmi Note 10 Build/SKQ1.211006.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/121.0.6167.164 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/480.0.0.12.100;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 13; KB2003 Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/123.0.6312.40 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 11; POCO X3 Pro Build/RKQ1.200826.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.144 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/450.0.0.10.105;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 14; vivo Y21 Build/UP1A.231005.007; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/520.0.0.15.115;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 12; SM-S908B Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/122.0.6261.90 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/510.0.0.10.110;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 10; SM-A525F Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/115.0.5790.166 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/400.0.0.9.110;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 11; vivo Y11 Build/PKQ1.190616.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/138.0.7204.179 Mobile Safari/537.36[FBAN/EMA;FBLC/en_GB;FBAV/500.0.0.8.103;FBCX/modulariab;]",
-"Mozilla/5.0 (Linux; Android 10; SM-G960U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/300.0.0.0.0;]",
-"Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/301.0.0.0.0;]",
-"Mozilla/5.0 (Linux; Android 12; SM-A525F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]",
-"Mozilla/5.0 (Linux; Android 11; Redmi Note 9S) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/301.0.0.0.0;]",
-"Mozilla/5.0 (Linux; Android 12; OnePlus 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]",
-"Mozilla/5.0 (Linux; Android 12; Samsung SM-S901U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]",
-"Mozilla/5.0 (Linux; Android 11; Google Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/301.0.0.0.0;]",
-"Mozilla/5.0 (Linux; Android 12; Xiaomi 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Mobile Safari/537.36 [FBAN/EMA;FBLC/en_US;FBAV/302.0.0.0.0;]"
-]
-
 # ─────────────────────────────────────────────────────────────
 
 # CONFIG / SETTINGS HELPERS
@@ -723,11 +735,48 @@ def create_fbunconfirmed(account_type, usern, gender, password=None, session=Non
 
         try:
 
-            resp = session.get(url, headers=headers, timeout=60)
+            def get_fb_form(url, headers):
+                # Use a session to keep cookies (very important for 'wtsid' to work)
+                session = requests.Session()
 
-            soup = BeautifulSoup(resp.text, "html.parser")
+                # FIRST REQUEST
+                resp = session.get(url, headers=headers, allow_redirects=False)
 
+                # Loop to handle Facebook's jump-scares
+                for _ in range(3):  # Try up to 3 redirects
+                    if 'Location' in resp.headers:
+                        new_url = resp.headers['Location']
+
+                        # Fix the protocol crash
+                        if new_url.startswith('fbredirect://'):
+                            new_url = new_url.replace('fbredirect://', 'https://')
+
+                        print(f"Following jump: {new_url}")
+
+                        # Update Referer to satisfy security checks
+                        headers['Referer'] = url
+                        resp = session.get(new_url, headers=headers, allow_redirects=False)
+
+                        # If we finally get a 200 OK, stop looping
+                        if resp.status_code == 200:
+                            break
+                    else:
+                        break
+
+                return resp
+
+            # Execute
+            response = get_fb_form(url, headers)
+            soup = BeautifulSoup(response.text, "html.parser")
             form = soup.find("form")
+
+            if form:
+                print("✅ Form successfully captured!")
+                # Save the file for your debug
+                with open("success_form.html", "w", encoding="utf-8") as f:
+                    f.write(response.text)
+            else:
+                print("❌ Still no form. FB might be blocking based on IP/Header mismatch.")
 
             if form:
 
